@@ -1,0 +1,34 @@
+﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Finly"
+             xmlns:converters="clr-namespace:Finly.Converters"
+             x:Class="Finly.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <converters:DescriptionValidationConverter x:Key="DescriptionValidationConverter"/>
+            <converters:CategoryValidationConverter x:Key="CategoryValidationConverter"/>
+            <converters:AccountValidationConverter x:Key="AccountValidationConverter"/>
+
+            <converters:ColorToLightColorConverter x:Key="ColorToLightColorConverter"/>
+            <converters:AmountColorConverter x:Key="AmountColorConverter"/>
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
+            <converters:AccountTypeToIconConverter x:Key="AccountTypeToIconConverter"/>
+            <converters:AccountStatusToColorConverter x:Key="AccountStatusToColorConverter"/>
+            <converters:AccountStatusColorConverter x:Key="AccountStatusColorConverter"/>
+            <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
+            <converters:CountToBoolConverter x:Key="CountToBoolConverter"/>
+            <converters:InvertedCountToBoolConverter x:Key="InvertedCountToBoolConverter"/>
+            <converters:NumericConverter x:Key="InveNumericConverterrtedCountToBoolConverter"/>
+            <converters:BoolToStatusTextConverter x:Key="BoolToStatusTextConverter"/>
+            <converters:SavingsColorConverter x:Key="SavingsColorConverter"/>
+            <converters:AccountTypeToStringConverter x:Key="AccountTypeToStringConverter"/>
+            <converters:AmountValidationConverter x:Key="AmountValidationConverter"/>
+            <converters:DateValidationConverter x:Key="DateValidationConverter"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

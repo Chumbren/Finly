@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Finly.ViewModels"
+             xmlns:models="clr-namespace:Finly.Models"
+             xmlns:converters="clr-namespace:Finly.Converters"
+             x:Class="Finly.Views.AccountsPage"
+             x:DataType="viewmodels:AccountsViewModel"
+             Title="Счета"
+             BackgroundColor="#F8F9FE">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
+            <Shadow x:Key="CardShadow" Brush="#2D3436" Offset="0,4" Radius="12" Opacity="0.15"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="0" Spacing="0" VerticalOptions="Start">
+
+            <!-- HEADER -->
+            <Frame BackgroundColor="#6C63FF"
+                   Padding="0" 
+                   Margin="20,20,20,0"
+                   HasShadow="True"
+                   CornerRadius="25">
+                <Frame.Shadow>
+                    <Shadow Brush="#6C63FF" Offset="0,8" Radius="20" Opacity="0.4"/>
+                </Frame.Shadow>
+
+                <Grid Padding="25" RowDefinitions="Auto,Auto" RowSpacing="10">
+                    <HorizontalStackLayout Grid.Row="0" Spacing="10">
+                        <Label Text="💳" FontSize="28"/>
+                        <Label Text="Мои счета" TextColor="White" FontSize="24" FontAttributes="Bold"/>
+                    </HorizontalStackLayout>
+                    <Label Grid.Row="1" 
+                           Text="{Binding TotalBalance, StringFormat='Общий баланс: {0:C}'}" 
+                           TextColor="White" 
+                           FontSize="30" 
+                           FontAttributes="Bold"
+                           Opacity="0.95"/>
+                </Grid>
+            </Frame>
+
+            <!-- ACCOUNTS LIST -->
+            <ContentView Padding="20,15,20,15">
+                <CollectionView ItemsSource="{Binding Accounts}" 
+                                SelectionMode="None"
+                                BackgroundColor="Transparent">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:Account">
+                            <SwipeView>
+                                <SwipeView.LeftItems>
+                                    <SwipeItems Mode="Reveal">
+                                        <SwipeItemView BackgroundColor="#0984E3" 
+                                                       Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:AccountsViewModel}}, Path=StartEditAccountCommand}" 
+                                                       CommandParameter="{Binding .}">
+                                            <Grid WidthRequest="90" HeightRequest="100">
+                                                <Label Text="✏️" FontSize="28" 
+                                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            </Grid>
+                                        </SwipeItemView>
+                                    </SwipeItems>
+                                </SwipeView.LeftItems>
+
+                                <SwipeView.RightItems>
+                                    <SwipeItems Mode="Reveal">
+                                        <SwipeItemView BackgroundColor="#D63031" 
+                                                       Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:AccountsViewModel}}, Path=DeleteAccountCommand}" 
+                                                       CommandParameter="{Binding .}">
+                                            <Grid WidthRequest="90" HeightRequest="100">
+                                                <Label Text="🗑️" FontSize="28" 
+                                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            </Grid>
+                                        </SwipeItemView>
+                                    </SwipeItems>
+                                </SwipeView.RightItems>
+
+                                <ContentView Padding="0,5,0,5">
+                                    <Frame BackgroundColor="White" 
+                                           CornerRadius="20" 
+                                           Padding="20"
+                                           HasShadow="True"
+                                           BorderColor="#E0E0E0">
+                                        <Frame.Shadow>
+                                            <Shadow Brush="#000000" Offset="0,3" Radius="10" Opacity="0.08"/>
+                                        </Frame.Shadow>
+
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+
+                                            <!-- Иконка с цветной рамкой (ИСПРАВЛЕНО) -->
+                                            <Frame Grid.Column="0" 
+                                                   WidthRequest="60" 
+                                                   HeightRequest="60" 
+                                                   CornerRadius="30"
+                                                   BackgroundColor="#F8F9FE"
+                                                   Padding="0"
+                                                   IsClippedToBounds="True"
+                                                   HasShadow="False"
+                                                   BorderColor="#6C63FF" >
+                                                <Label Text="{Binding Type, Converter={StaticResource AccountTypeToIconConverter}}" 
+                                                       FontSize="28"
+                                                       HorizontalOptions="Center" 
+                                                       VerticalOptions="Center"/>
+                                            </Frame>
+
+                                            <!-- Информация -->
+                                            <VerticalStackLayout Grid.Column="1" 
+                                                                VerticalOptions="Center" 
+                                                                Spacing="5">
+                                                <HorizontalStackLayout Spacing="8">
+                                                    <Label Text="{Binding Name}" 
+                                                           FontSize="18" 
+                                                           FontAttributes="Bold"
+                                                           TextColor="#2D3436"
+                                                           LineBreakMode="TailTruncation"/>
+                                                    <Label Text="⭐" 
+                                                           IsVisible="{Binding IsPrimary}" 
+                                                           FontSize="18" 
+                                                           VerticalOptions="Center"/>
+                                                </HorizontalStackLayout>
+
+                                                <Label Text="{Binding BankName}" 
+                                                       FontSize="14" 
+                                                       TextColor="#636E72" 
+                                                       IsVisible="{Binding BankName, Converter={StaticResource StringToBoolConverter}}"/>
+
+                                                <Label Text="{Binding AccountNumber, StringFormat='•••• {0}'}" 
+                                                       FontSize="13" 
+                                                       TextColor="#B2BEC3" 
+                                                       IsVisible="{Binding AccountNumber, Converter={StaticResource StringToBoolConverter}}"/>
+
+                                                <!-- Статус -->
+                                                <Frame BackgroundColor="{Binding IsActive, Converter={StaticResource AccountStatusColorConverter}}" 
+                                                       Padding="10,4" 
+                                                       CornerRadius="8"
+                                                       HasShadow="False"
+                                                       HorizontalOptions="Start"
+                                                       Margin="0,5,0,0">
+                                                    <Label Text="{Binding IsActive, Converter={StaticResource BoolToStatusTextConverter}}" 
+                                                           TextColor="White" 
+                                                           FontSize="12"
+                                                           FontAttributes="Bold"/>
+                                                </Frame>
+                                            </VerticalStackLayout>
+
+                                            <!-- Баланс -->
+                                            <VerticalStackLayout Grid.Column="2" 
+                                                                HorizontalOptions="End" 
+                                                                VerticalOptions="Center"
+                                                                Spacing="5">
+                                                <Label Text="{Binding Balance, StringFormat='{0:N2} ₽'}" 
+                                                       FontSize="20" 
+                                                       FontAttributes="Bold"
+                                                       TextColor="#2D3436"
+                                                       HorizontalTextAlignment="End"/>
+                                                <Frame BackgroundColor="#F0F0F0" 
+                                                       Padding="8,4" 
+                                                       CornerRadius="6"
+                                                       HasShadow="False">
+                                                    <Label Text="{Binding Currency}" 
+                                                           FontSize="12" 
+                                                           TextColor="#636E72"
+                                                           HorizontalTextAlignment="Center"/>
+                                                </Frame>
+                                            </VerticalStackLayout>
+                                        </Grid>
+                                    </Frame>
+                                </ContentView>
+                            </SwipeView>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout Padding="40" 
+                                            HorizontalOptions="Center" 
+                                            VerticalOptions="Center"
+                                            Spacing="20">
+                            <Frame BackgroundColor="White" 
+                                   WidthRequest="140" HeightRequest="140" 
+                                   CornerRadius="70"
+                                   HasShadow="True">
+                                <Label Text="💳" FontSize="60" 
+                                       HorizontalOptions="Center" VerticalOptions="Center"/>
+                            </Frame>
+                            <Label Text="Нет счетов" 
+                                   FontSize="20" 
+                                   TextColor="#636E72" 
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center"/>
+                            <Label Text="Добавьте первый счет для учета финансов" 
+                                   FontSize="15" 
+                                   TextColor="#B2BEC3" 
+                                   HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+            </ContentView>
+
+            <!-- ACTION BUTTONS -->
+            <ContentView Padding="20,0,20,25">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
+                    <Button Grid.Column="0" 
+                            Text="➕ Новый счет" 
+                            Command="{Binding StartAddAccountCommand}" 
+                            BackgroundColor="#00D9A5" 
+                            TextColor="White" 
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            CornerRadius="15"
+                            HeightRequest="60">
+                        <Button.Shadow>
+                            <Shadow Brush="#00D9A5" Offset="0,6" Radius="15" Opacity="0.4"/>
+                        </Button.Shadow>
+                    </Button>
+                    <Button Grid.Column="1" 
+                            Text="🔄 Обновить" 
+                            Command="{Binding LoadAccountsCommand}" 
+                            BackgroundColor="#6C63FF" 
+                            TextColor="White" 
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            CornerRadius="15"
+                            HeightRequest="60">
+                        <Button.Shadow>
+                            <Shadow Brush="#6C63FF" Offset="0,6" Radius="15" Opacity="0.4"/>
+                        </Button.Shadow>
+                    </Button>
+                </Grid>
+            </ContentView>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

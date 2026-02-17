@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="Finly.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Finly"
+    xmlns:views="clr-namespace:Finly.Views"
+    Title="Finly">
+
+    <ShellContent
+        Title="Home"
+        ContentTemplate="{DataTemplate local:MainPage}"
+        Route="MainPage" />
+    <ShellContent
+        Title="Transaction"
+        ContentTemplate="{DataTemplate views:TransactionsPage}"
+        Route="TransactionsPage" />
+    <ShellContent
+        Title="AddTransaction"
+        ContentTemplate="{DataTemplate views:AddTransactionPage}"
+        Route="AddTransactionPage" />
+  
+    <ShellContent
+        Title="Reports"
+        ContentTemplate="{DataTemplate views:ReportsPage}"
+        Route="ReportsPage" />
+    <ShellContent
+        Title="Accounts"
+        ContentTemplate="{DataTemplate views:AccountsPage}"
+        Route="AccountsPage" />
+    <ShellContent
+        Title="AddAccount"
+        ContentTemplate="{DataTemplate views:AddAccountPage}"
+        Route="AddAccountPage" />
+
+</Shell>

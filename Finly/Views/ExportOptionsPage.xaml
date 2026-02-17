@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Finly.Views.ExportOptionsPage"
+             Title="Экспорт отчета"
+             BackgroundColor="#80000000">
+
+    <!-- Затемнение фона через полупрозрачный фон страницы -->
+    <Grid VerticalOptions="Center" HorizontalOptions="Center" Padding="20">
+        <Frame BackgroundColor="White" 
+               CornerRadius="20" 
+               Padding="20" 
+               WidthRequest="350"
+               HasShadow="True"
+               HorizontalOptions="Center"
+               VerticalOptions="Center">
+
+            <VerticalStackLayout Spacing="20">
+
+                <!-- Заголовок -->
+                <Label Text="Экспорт отчета" 
+                       FontSize="20" 
+                       FontAttributes="Bold" 
+                       TextColor="#333" 
+                       HorizontalOptions="Center"/>
+
+                <!-- Подзаголовок -->
+                <Label Text="Выберите формат экспорта" 
+                       FontSize="14" 
+                       TextColor="#666" 
+                       HorizontalOptions="Center"/>
+
+               
+
+                <!-- Выбор формата -->
+                <Label Text="Формат файла:" FontSize="15" TextColor="#444" Padding="10,0,10,0"/>
+
+                <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
+
+                    <Frame CornerRadius="15" BackgroundColor="#F5F5F5" Padding="15,10" WidthRequest="80">
+                        <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                            <Label Text="📄" FontSize="30" HorizontalOptions="Center"/>
+                            <Label Text="PDF" FontSize="14" FontAttributes="Bold" TextColor="#333" HorizontalOptions="Center"/>
+                            <RadioButton GroupName="ExportFormat" 
+                   IsChecked="{Binding SelectedFormat, Mode=TwoWay, Converter={StaticResource StringToBoolConverter}, ConverterParameter=PDF}"
+                   HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                 
+
+                    <!-- Excel кнопка -->
+                    <Frame CornerRadius="15" 
+                           BackgroundColor="#F5F5F5" 
+                           Padding="15,10" 
+                           WidthRequest="80">
+                        <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                            <Label Text="📊" FontSize="30" HorizontalOptions="Center"/>
+                            <Label Text="Excel" FontSize="14" FontAttributes="Bold" TextColor="#333" HorizontalOptions="Center"/>
+                            <RadioButton x:Name="ExcelRadio" 
+                                       GroupName="ExportFormat" 
+                                       HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </Frame>
+                </HorizontalStackLayout>
+
+                <!-- Кнопки действий -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="15" Padding="10,20,10,0">
+
+                    <!-- Кнопка Отмена -->
+                    <Button Grid.Column="0" 
+                            Text="Отмена" 
+                            BackgroundColor="#E0E0E0"
+                            TextColor="#333"
+                            CornerRadius="10"
+                            HeightRequest="45"
+                            Command="{Binding CloseCommand}"/>
+
+                    <!-- Кнопка Экспорт -->
+                    <Button Grid.Column="1" 
+                            Text="Экспорт" 
+                            BackgroundColor="#6200EA"
+                            TextColor="White"
+                            CornerRadius="10"
+                            HeightRequest="45"
+                            Command="{Binding ExportCommand}"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Frame>
+    </Grid>
+</ContentPage>

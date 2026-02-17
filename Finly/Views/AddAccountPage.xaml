@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Finly.ViewModels"
+             xmlns:animations="clr-namespace:Finly.Animations"
+             x:Class="Finly.Views.AddAccountPage"
+             x:DataType="viewmodels:AddAccountViewModel"
+             Title="{Binding Title}"
+             BackgroundColor="#F8F9FE">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <Shadow x:Key="CardShadow" Brush="#2D3436" Offset="0,4" Radius="12" Opacity="0.15"/>
+
+            <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#8B5CF6" Offset="0.0"/>
+                <GradientStop Color="#6C63FF" Offset="0.5"/>
+                <GradientStop Color="#5B4CDB" Offset="1.0"/>
+            </LinearGradientBrush>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="0" Spacing="0" VerticalOptions="Start">
+
+            <!-- HEADER -->
+            <Frame Background="{StaticResource HeaderGradient}"
+                   Padding="0" 
+                   Margin="0,0,0,0"
+                   HasShadow="True"
+                   CornerRadius="0"
+                   HeightRequest="160">
+                <Frame.Shadow>
+                    <Shadow Brush="#6C63FF" Offset="0,8" Radius="20" Opacity="0.4"/>
+                </Frame.Shadow>
+
+                <Grid Padding="25" RowDefinitions="Auto,Auto" RowSpacing="8">
+                    <HorizontalStackLayout Grid.Row="0" Spacing="10">
+                        <Label Text="🏦" FontSize="28"/>
+                        <Label Text="{Binding Title}" TextColor="White" FontSize="24" FontAttributes="Bold"/>
+                    </HorizontalStackLayout>
+                    <Label Grid.Row="1" 
+                           Text="Заполните информацию о счете" 
+                           TextColor="White" 
+                           FontSize="15" 
+                           Opacity="0.85"/>
+                </Grid>
+            </Frame>
+
+            <!-- FORM -->
+            <ContentView Padding="20,20,20,25">
+                <VerticalStackLayout Spacing="18">
+
+                    <!-- Account name -->
+                    <Frame BackgroundColor="White" 
+                           CornerRadius="20" 
+                           Padding="25"
+                           HasShadow="True"
+                           BorderColor="Transparent">
+                        <Frame.Shadow>
+                            <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.1"/>
+                        </Frame.Shadow>
+                        <VerticalStackLayout Spacing="10">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="📝" FontSize="18"/>
+                                <Label Text="Название счета" FontSize="15" TextColor="#6C63FF" FontAttributes="Bold"/>
+                            </HorizontalStackLayout>
+                            <Entry Text="{Binding AccountName}" 
+                                   Placeholder="Например: Наличные, Сбербанк" 
+                                   FontSize="17"
+                                   TextColor="#2D3436"
+                                   PlaceholderColor="#B2BEC3"
+                                   MaxLength="50"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Account type -->
+                    <Frame BackgroundColor="White" 
+                           CornerRadius="20" 
+                           Padding="25"
+                           HasShadow="True"
+                           BorderColor="Transparent">
+                        <Frame.Shadow>
+                            <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.1"/>
+                        </Frame.Shadow>
+                        <VerticalStackLayout Spacing="10">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="🏷️" FontSize="18"/>
+                                <Label Text="Тип счета" FontSize="15" TextColor="#6C63FF" FontAttributes="Bold"/>
+                            </HorizontalStackLayout>
+                            <Picker ItemsSource="{Binding AccountTypes}" 
+                                    SelectedItem="{Binding AccountType}" 
+                                    Title="Выберите тип счета"
+                                    FontSize="17"
+                                    TextColor="#2D3436"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Currency -->
+                    <Frame BackgroundColor="White" 
+                           CornerRadius="20" 
+                           Padding="25"
+                           HasShadow="True"
+                           BorderColor="Transparent">
+                        <Frame.Shadow>
+                            <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.1"/>
+                        </Frame.Shadow>
+                        <VerticalStackLayout Spacing="10">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="💱" FontSize="18"/>
+                                <Label Text="Валюта" FontSize="15" TextColor="#6C63FF" FontAttributes="Bold"/>
+                            </HorizontalStackLayout>
+                            <Picker SelectedItem="{Binding Currency}" 
+                                    Title="Выберите валюту"
+                                    FontSize="17"
+                                    TextColor="#2D3436">
+                                <Picker.ItemsSource>
+                                    <x:Array Type="{x:Type x:String}">
+                                        <x:String>RUB</x:String>
+                                        <x:String>USD</x:String>
+                                        <x:String>EUR</x:String>
+                                    </x:Array>
+                                </Picker.ItemsSource>
+                            </Picker>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Initial balance -->
+                    <Frame BackgroundColor="White" 
+                           CornerRadius="20" 
+                           Padding="25"
+                           HasShadow="True"
+                           BorderColor="Transparent">
+                        <Frame.Shadow>
+                            <Shadow Brush="#00D9A5" Offset="0,4" Radius="12" Opacity="0.1"/>
+                        </Frame.Shadow>
+                        <VerticalStackLayout Spacing="10">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="💰" FontSize="18"/>
+                                <Label Text="Начальный баланс" FontSize="15" TextColor="#00D9A5" FontAttributes="Bold"/>
+                            </HorizontalStackLayout>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="15">
+                                <Entry Grid.Column="0" 
+                                       Text="{Binding InitialBalance, StringFormat='{0:F2}'}" 
+                                       Keyboard="Numeric" 
+                                       FontSize="22"
+                                       TextColor="#2D3436"
+                                       PlaceholderColor="#B2BEC3"
+                                       FontAttributes="Bold"/>
+                                <Frame Grid.Column="1" 
+                                       BackgroundColor="#F0FFF9" 
+                                       Padding="15,8" 
+                                       CornerRadius="10"
+                                       HasShadow="False">
+                                    <Label Text="{Binding Currency}" 
+                                           FontSize="20" 
+                                           FontAttributes="Bold"
+                                           TextColor="#00D9A5"
+                                           VerticalOptions="Center"/>
+                                </Frame>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Bank name -->
+                    <Frame BackgroundColor="White" 
+                           CornerRadius="20" 
+                           Padding="25"
+                           HasShadow="True"
+                           BorderColor="Transparent"
+                           IsVisible="{Binding IsBankAccount}">
+                        <Frame.Shadow>
+                            <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.1"/>
+                        </Frame.Shadow>
+                        <VerticalStackLayout Spacing="10">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="🏦" FontSize="18"/>
+                                <Label Text="Название банка" FontSize="15" TextColor="#6C63FF" FontAttributes="Bold"/>
+                            </HorizontalStackLayout>
+                            <Entry Text="{Binding BankName}" 
+                                   Placeholder="Например: Сбербанк, Тинькофф" 
+                                   FontSize="17"
+                                   TextColor="#2D3436"
+                                   PlaceholderColor="#B2BEC3"
+                                   MaxLength="30"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Account number -->
+                    <Frame BackgroundColor="White" 
+                           CornerRadius="20" 
+                           Padding="25"
+                           HasShadow="True"
+                           BorderColor="Transparent"
+                           IsVisible="{Binding IsBankAccount}">
+                        <Frame.Shadow>
+                            <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.1"/>
+                        </Frame.Shadow>
+                        <VerticalStackLayout Spacing="10">
+                            <HorizontalStackLayout Spacing="8">
+                                <Label Text="🔢" FontSize="18"/>
+                                <Label Text="Номер счета/карты" FontSize="15" TextColor="#6C63FF" FontAttributes="Bold"/>
+                            </HorizontalStackLayout>
+                            <Entry Text="{Binding AccountNumber}" 
+                                   Placeholder="Например: ****1234" 
+                                   FontSize="17"
+                                   TextColor="#2D3436"
+                                   PlaceholderColor="#B2BEC3"
+                                   MaxLength="20"
+                                   Keyboard="Telephone"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Toggles -->
+                    <Frame BackgroundColor="White" 
+                           CornerRadius="20" 
+                           Padding="25"
+                           HasShadow="True"
+                           BorderColor="Transparent">
+                        <Frame.Shadow>
+                            <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.1"/>
+                        </Frame.Shadow>
+                        <VerticalStackLayout Spacing="20">
+
+                            <!-- Primary -->
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="15">
+                                <HorizontalStackLayout Grid.Column="0" Spacing="10">
+                                    <Label Text="⭐" FontSize="20"/>
+                                    <Label Text="Основной счет" FontSize="17" TextColor="#2D3436" VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
+                                <CheckBox Grid.Column="1" 
+                                          IsChecked="{Binding IsPrimary}" 
+                                          Color="#6C63FF" 
+                                          VerticalOptions="Center"
+                                          Scale="1.3"/>
+                            </Grid>
+
+                            <BoxView HeightRequest="1" BackgroundColor="#F0F0F0" Margin="0,5"/>
+
+                            <!-- Active -->
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="15">
+                                <HorizontalStackLayout Grid.Column="0" Spacing="10">
+                                    <Label Text="✅" FontSize="20"/>
+                                    <Label Text="Активен" FontSize="17" TextColor="#2D3436" VerticalOptions="Center"/>
+                                </HorizontalStackLayout>
+                                <CheckBox Grid.Column="1" 
+                                          IsChecked="{Binding IsActive}" 
+                                          Color="#00D9A5" 
+                                          VerticalOptions="Center"
+                                          Scale="1.3"/>
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- BUTTONS -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="15" Margin="0,10,0,0">
+                        <Button Grid.Column="0" 
+                                Text="🗑️ Удалить" 
+                                Command="{Binding DeleteAccountCommand}" 
+                                IsVisible="{Binding IsEditMode}" 
+                                BackgroundColor="#FF6B6B" 
+                                TextColor="White" 
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                CornerRadius="15"
+                                HeightRequest="60">
+                            <Button.Shadow>
+                                <Shadow Brush="#FF6B6B" Offset="0,6" Radius="15" Opacity="0.4"/>
+                            </Button.Shadow>
+                        </Button>
+
+                        <Button Grid.Column="1" 
+                                Text="💾 Сохранить" 
+                                Command="{Binding SaveAccountCommand}" 
+                                BackgroundColor="#00D9A5" 
+                                TextColor="White" 
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                CornerRadius="15"
+                                HeightRequest="60">
+                            <Button.Shadow>
+                                <Shadow Brush="#00D9A5" Offset="0,6" Radius="15" Opacity="0.4"/>
+                            </Button.Shadow>
+                        </Button>
+                    </Grid>
+
+                    <Label Text="* Обязательные поля для заполнения" 
+                           FontSize="13" 
+                           TextColor="#B2BEC3" 
+                           HorizontalOptions="Center"
+                           Margin="0,15,0,0"/>
+                </VerticalStackLayout>
+            </ContentView>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Finly.ViewModels"
+             xmlns:converters="clr-namespace:Finly.Converters"
+             x:Class="Finly.Views.TransactionsPage"
+             x:DataType="viewmodels:TransactionsViewModel"
+             Title="Операции"
+             BackgroundColor="#F8F9FE">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:AmountColorConverter x:Key="AmountColorConverter"/>
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
+            <Shadow x:Key="CardShadow" Brush="#2D3436" Offset="0,4" Radius="12" Opacity="0.15"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- 1. HEADER с градиентом -->
+        <Frame Grid.Row="0" 
+               BackgroundColor="#6C63FF"
+               Padding="0"
+               CornerRadius="0"
+               HasShadow="True">
+            <Frame.Shadow>
+                <Shadow Brush="#6C63FF" Offset="0,6" Radius="15" Opacity="0.4"/>
+            </Frame.Shadow>
+
+            <Grid Padding="20,15,20,15" ColumnDefinitions="*,Auto">
+                <VerticalStackLayout Grid.Column="0" Spacing="3">
+                    <HorizontalStackLayout Spacing="10">
+                        <Label Text="📋" FontSize="24"/>
+                        <Label Text="Операции" TextColor="White" FontSize="24" FontAttributes="Bold"/>
+                    </HorizontalStackLayout>
+                    <Label Text="История всех транзакций" TextColor="White" FontSize="13" Opacity="0.85"/>
+                </VerticalStackLayout>
+
+                <Frame Grid.Column="1" 
+                       BackgroundColor="White" 
+                       Padding="0"
+                       CornerRadius="18"
+                       HeightRequest="50"
+                       WidthRequest="50"
+                       HasShadow="True"
+                       IsClippedToBounds="True">
+                    <Frame.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding AddTransactionCommand}"/>
+                    </Frame.GestureRecognizers>
+                    <Grid>
+                        <BoxView BackgroundColor="#6C63FF" 
+                                 Opacity="0.15" 
+                                 CornerRadius="15"
+                                 WidthRequest="40" HeightRequest="40"
+                                 HorizontalOptions="Center" VerticalOptions="Center"/>
+                        <Label Text="+" FontSize="26" TextColor="#6C63FF" 
+                               HorizontalOptions="Center" VerticalOptions="Center" 
+                               FontAttributes="Bold"/>
+                    </Grid>
+                </Frame>
+            </Grid>
+        </Frame>
+
+        <!-- 2. FILTERS с улучшенным дизайном -->
+        <Frame Grid.Row="1" 
+               BackgroundColor="White" 
+               Padding="20" 
+               Margin="15,15,15,10"
+               CornerRadius="20"
+               HasShadow="True"
+               BorderColor="Transparent">
+            <Frame.Shadow>
+                <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.1"/>
+            </Frame.Shadow>
+
+            <VerticalStackLayout Spacing="15">
+                <!-- Период -->
+                <Grid ColumnDefinitions="Auto,*,Auto,*,*" ColumnSpacing="10">
+                    <Label Grid.Column="0" Text="📅" FontSize="18" VerticalOptions="Center"/>
+                    <Label Grid.Column="1" Text="Период:" FontSize="14" FontAttributes="Bold" TextColor="#6C63FF" VerticalOptions="Center"/>
+                    <DatePicker Grid.Column="2" 
+                                Date="{Binding StartDate}" 
+                                MinimumDate="2020-01-01"
+                                TextColor="#2D3436"
+                                FontSize="14"/>
+                    <Label Grid.Column="3" Text="—" VerticalOptions="Center" TextColor="#B2BEC3" FontSize="18"/>
+                    <DatePicker Grid.Column="4" 
+                                Date="{Binding EndDate}" 
+                                MinimumDate="2020-01-01"
+                                TextColor="#2D3436"
+                                FontSize="14"/>
+                </Grid>
+
+                <!-- Поиск -->
+                <Frame BackgroundColor="#F8F9FE" 
+                       Padding="15,12" 
+                       CornerRadius="15"
+                       HasShadow="False"
+                       BorderColor="#E0E0E0">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                        <Label Grid.Column="0" Text="🔍" FontSize="18" VerticalOptions="Center"/>
+                        <SearchBar Grid.Column="1" 
+                                   Placeholder="Поиск операции..." 
+                                   Text="{Binding SearchQuery}"
+                                   CancelButtonColor="#6C63FF"
+                                   BackgroundColor="Transparent"
+                                   PlaceholderColor="#B2BEC3"
+                                   TextColor="#2D3436"
+                                   FontSize="15"/>
+                    </Grid>
+                </Frame>
+            </VerticalStackLayout>
+        </Frame>
+
+        <!-- 3. TRANSACTIONS LIST -->
+        <RefreshView Grid.Row="2" 
+                     Command="{Binding LoadTransactionsCommand}" 
+                     IsRefreshing="{Binding IsBusy}">
+            <RefreshView.ControlTemplate>
+                <ControlTemplate>
+                    <Grid>
+                        <ContentPresenter/>
+                        <ActivityIndicator IsRunning="{TemplateBinding IsRefreshing}" 
+                                           IsVisible="{TemplateBinding IsRefreshing}"
+                                           Color="#6C63FF"
+                                           VerticalOptions="Center"
+                                           HorizontalOptions="Center"
+                                           Scale="1.3"/>
+                    </Grid>
+                </ControlTemplate>
+            </RefreshView.ControlTemplate>
+
+            <CollectionView ItemsSource="{Binding Transactions}" 
+                            SelectionMode="None"
+                            BackgroundColor="Transparent">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewmodels:TransactionDisplayItem">
+                        <SwipeView>
+                            <!-- Свайп ВЛЕВО (Редактировать) -->
+                            <SwipeView.LeftItems>
+                                <SwipeItems Mode="Reveal">
+                                    <SwipeItemView BackgroundColor="#0984E3" 
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TransactionsViewModel}}, Path=EditTransactionCommand}" 
+                                                   CommandParameter="{Binding .}">
+                                        <Grid WidthRequest="90" HeightRequest="100">
+                                            <BoxView BackgroundColor="White" Opacity="0.2" 
+                                                     CornerRadius="10"
+                                                     WidthRequest="60" HeightRequest="60"
+                                                     HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="✏️" FontSize="28" 
+                                                   HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Grid>
+                                    </SwipeItemView>
+                                </SwipeItems>
+                            </SwipeView.LeftItems>
+
+                            <!-- Свайп ВПРАВО (Удалить) -->
+                            <SwipeView.RightItems>
+                                <SwipeItems Mode="Reveal">
+                                    <SwipeItemView BackgroundColor="#D63031" 
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TransactionsViewModel}}, Path=DeleteTransactionCommand}" 
+                                                   CommandParameter="{Binding .}">
+                                        <Grid WidthRequest="90" HeightRequest="100">
+                                            <BoxView BackgroundColor="White" Opacity="0.2" 
+                                                     CornerRadius="10"
+                                                     WidthRequest="60" HeightRequest="60"
+                                                     HorizontalOptions="Center" VerticalOptions="Center"/>
+                                            <Label Text="🗑️" FontSize="28" 
+                                                   HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Grid>
+                                    </SwipeItemView>
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+
+                            <!-- Карточка транзакции -->
+                            <ContentView Padding="15,6,15,6">
+                                <Frame BackgroundColor="White" 
+                                       CornerRadius="20" 
+                                       Padding="18"
+                                       HasShadow="True"
+                                       BorderColor="#E0E0E0">
+                                    <Frame.Shadow>
+                                        <Shadow Brush="#000000" Offset="0,3" Radius="10" Opacity="0.08"/>
+                                    </Frame.Shadow>
+
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+
+                                        <!-- Иконка категории -->
+                                        <Frame Grid.Column="0" 
+                                               WidthRequest="55" 
+                                               HeightRequest="55" 
+                                               CornerRadius="27"
+                                               BackgroundColor="#F8F9FE"
+                                               Padding="0"
+                                               IsClippedToBounds="True"
+                                               HasShadow="False"
+                                               BorderColor="#6C63FF"
+                                               >
+                                            <Label Text="{Binding Category.Icon}" 
+                                                   FontSize="26"
+                                                   HorizontalOptions="Center" 
+                                                   VerticalOptions="Center"/>
+                                        </Frame>
+
+                                        <!-- Информация -->
+                                        <VerticalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center">
+                                            <Label Text="{Binding Description}" 
+                                                   FontSize="17" 
+                                                   FontAttributes="Bold"
+                                                   TextColor="#2D3436"
+                                                   LineBreakMode="TailTruncation"/>
+
+                                            <HorizontalStackLayout Spacing="8">
+                                                <Frame BackgroundColor="#F0F0F0" 
+                                                       Padding="6,3" 
+                                                       CornerRadius="6"
+                                                       HasShadow="False">
+                                                    <Label Text="{Binding Category.Name}" 
+                                                           FontSize="12" 
+                                                           TextColor="#636E72"/>
+                                                </Frame>
+                                                <Label Text="•" FontSize="12" TextColor="#DFE6E9"
+                                                       IsVisible="{Binding Account.Name, Converter={StaticResource StringToBoolConverter}}"/>
+                                                <Label Text="{Binding Account.Name}" 
+                                                       FontSize="12" 
+                                                       TextColor="#636E72"
+                                                       IsVisible="{Binding Account.Name, Converter={StaticResource StringToBoolConverter}}"/>
+                                            </HorizontalStackLayout>
+
+                                            <Label Text="{Binding Date, StringFormat='{0:dd.MM.yyyy HH:mm}'}" 
+                                                   FontSize="12" 
+                                                   TextColor="#B2BEC3"/>
+                                        </VerticalStackLayout>
+
+                                        <!-- Сумма -->
+                                        <Label Grid.Column="2" 
+                                               Text="{Binding Amount, StringFormat='{0:C}'}" 
+                                               FontSize="19" 
+                                               FontAttributes="Bold"
+                                               TextColor="{Binding Amount, Converter={StaticResource AmountColorConverter}}"
+                                               HorizontalTextAlignment="End"
+                                               VerticalOptions="Center"/>
+                                    </Grid>
+                                </Frame>
+                            </ContentView>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" 
+                                        VerticalOptions="Center" 
+                                        Padding="40"
+                                        Spacing="20">
+                        <Frame BackgroundColor="White" 
+                               WidthRequest="120" HeightRequest="120" 
+                               CornerRadius="60"
+                               HasShadow="True">
+                            <Label Text="📭" FontSize="50" 
+                                   HorizontalOptions="Center" VerticalOptions="Center"/>
+                        </Frame>
+                        <Label Text="Нет операций" 
+                               FontSize="18" 
+                               TextColor="#636E72" 
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+                        <Label Text="Добавьте первую операцию" 
+                               FontSize="14" 
+                               TextColor="#B2BEC3" 
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- 4. SUMMARY с улучшенным дизайном -->
+        <Frame Grid.Row="3" 
+               BackgroundColor="White" 
+               Padding="20" 
+               Margin="15,10,15,20"
+               CornerRadius="20"
+               HasShadow="True"
+               BorderColor="Transparent">
+            <Frame.Shadow>
+                <Shadow Brush="#6C63FF" Offset="0,4" Radius="12" Opacity="0.15"/>
+            </Frame.Shadow>
+
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="15">
+                <!-- Доходы -->
+                <Frame BackgroundColor="#F0FFF9" 
+                       Padding="15" 
+                       CornerRadius="15"
+                       HasShadow="False"
+                       BorderColor="#00D9A5"
+                       >
+                    <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                        <Label HorizontalTextAlignment="Center" Text="📈" FontSize="20"/>
+                        <Label Text="Доходы" FontSize="12" TextColor="#636E72" HorizontalOptions="Center"/>
+                        <Label Text="{Binding TotalIncome, StringFormat='{0:C}'}" 
+                               FontSize="17" 
+                               TextColor="#00D9A5" 
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Расходы -->
+                <Frame Grid.Column="1" 
+                       BackgroundColor="#FFF5F5" 
+                       Padding="15" 
+                       CornerRadius="15"
+                       HasShadow="False"
+                       BorderColor="#FF6B6B"
+                       >
+                    <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                        <Label HorizontalTextAlignment="Center" Text="📉" FontSize="20"/>
+                        <Label Text="Расходы" FontSize="12" TextColor="#636E72" HorizontalOptions="Center"/>
+                        <Label Text="{Binding TotalExpenses, StringFormat='{0:C}'}" 
+                               FontSize="17" 
+                               TextColor="#FF6B6B" 
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Баланс -->
+                <Frame Grid.Column="2" 
+                       BackgroundColor="#F8F9FE" 
+                       Padding="15" 
+                       CornerRadius="15"
+                       HasShadow="False"
+                       BorderColor="#6C63FF"
+                       >
+                    <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
+                        <Label HorizontalTextAlignment="Center" Text="💰" FontSize="20"/>
+                        <Label Text="Баланс" FontSize="12" TextColor="#636E72" HorizontalOptions="Center"/>
+                        <Label Text="{Binding NetBalance, StringFormat='{0:C}'}" 
+                               FontSize="17" 
+                               TextColor="{Binding NetBalance, Converter={StaticResource AmountColorConverter}}" 
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+            </Grid>
+        </Frame>
+    </Grid>
+</ContentPage>

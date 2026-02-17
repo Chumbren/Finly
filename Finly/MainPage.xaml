@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Finly.ViewModels"
+             xmlns:converters="clr-namespace:Finly.Converters"
+             x:Class="Finly.MainPage"
+             Title="Finly"
+             BackgroundColor="#F5F7FA">
+    <!-- Светло-серый фон страницы -->
+
+    <ContentPage.Resources>
+        <!-- Тени для карточек -->
+        <Shadow x:Key="CardShadow" Brush="#33000000" Offset="0,4" Radius="10" Opacity="0.1"/>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="0" Spacing="0" VerticalOptions="Start">
+
+            <!-- 1. HEADER & BALANCE (Tinkoff Style - Dark) -->
+            <!-- Градиентный фон, текст БЕЛЫЙ -->
+            <Frame BackgroundColor="#4A148C" 
+                   Padding="0" 
+                   Margin="0,0,0,0"
+                   HasShadow="True"
+                   CornerRadius="0"
+                   HeightRequest="270">
+                <Frame.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#7B1FA2" Offset="0.0"/>
+                        <GradientStop Color="#4A148C" Offset="1.0"/>
+                    </LinearGradientBrush>
+                </Frame.Background>
+
+                <Grid Padding="20" RowDefinitions="Auto,Auto,Auto" >
+                    <!-- Заголовок и Баланс -->
+                    <VerticalStackLayout Grid.Row="0" Margin="0,0,0,10">
+                        <Label Text="Общий баланс" TextColor="White" FontSize="14" Opacity="0.8"/>
+                        <Label Text="{Binding TotalBalance, StringFormat='{0:C}'}" 
+                               TextColor="White" 
+                               FontSize="38" 
+                               FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+
+                    <!-- Статистика (Доходы/Расходы) - РАЗНЫЕ ЦВЕТА -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="15">
+                        <!-- Доходы (Зеленый) -->
+                        <Frame Grid.Column="0" BackgroundColor="#2E7D32" Padding="15" CornerRadius="12" HasShadow="True">
+                            <VerticalStackLayout>
+                                <Label Text="Доходы" TextColor="White" FontSize="13" Opacity="0.9"/>
+                                <Label Text="{Binding TodayIncome, StringFormat='{0:C}'}" 
+                                       TextColor="White" 
+                                       FontSize="20" 
+                                       FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                        </Frame>
+                        <!-- Расходы (Красный) -->
+                        <Frame Grid.Column="1" BackgroundColor="#C62828" Padding="15" CornerRadius="12" HasShadow="True">
+                            <VerticalStackLayout>
+                                <Label Text="Расходы" TextColor="White" FontSize="13" Opacity="0.9"/>
+                                <Label Text="{Binding TodayExpenses, StringFormat='{0:C}'}" 
+                                       TextColor="White" 
+                                       FontSize="20" 
+                                       FontAttributes="Bold"/>
+                            </VerticalStackLayout>
+                        </Frame>
+                    </Grid>
+
+                    <!-- Кнопки действий (Белые с иконками) -->
+                    <HorizontalStackLayout Grid.Row="2" Spacing="15" VerticalOptions="End" Margin="0, 20, 0, 0">
+                        <Frame BackgroundColor="White" Padding="12" CornerRadius="15" HasShadow="True" HeightRequest="55" WidthRequest="55">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding AddTransactionCommand}"/>
+                            </Frame.GestureRecognizers>
+                            <Label Text="+" FontSize="24" TextColor="#4A148C" HorizontalOptions="Center" VerticalOptions="Center" FontAttributes="Bold"/>
+                        </Frame>
+
+                        <Frame BackgroundColor="White" Padding="12" CornerRadius="15" HasShadow="True" HeightRequest="55" WidthRequest="55">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateToPageCommand}" CommandParameter="Reports"/>
+                            </Frame.GestureRecognizers>
+                            <Label Text="📊" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        </Frame>
+
+                        <Frame BackgroundColor="White" Padding="12" CornerRadius="15" HasShadow="True" HeightRequest="55" WidthRequest="55">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding NavigateToPageCommand}" CommandParameter="Accounts"/>
+                            </Frame.GestureRecognizers>
+                            <Label Text="💳" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                        </Frame>
+                    </HorizontalStackLayout>
+                </Grid>
+            </Frame>
+
+            <!-- 2. SEARCH BAR (Sberbank Style - Clean White) -->
+            <ContentView Padding="20,20,20,10">
+                <Frame BackgroundColor="White" 
+                       CornerRadius="12" 
+                       Padding="15,10"
+                       HasShadow="True"
+                       BorderColor="#EEEEEE">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Label Grid.Column="0" Text="🔍" FontSize="20" VerticalOptions="Center" Margin="0,0,10,0"/>
+                        <Entry Grid.Column="1" Placeholder="Поиск операции..." 
+                               PlaceholderColor="#999"
+                               TextColor="#333"
+                               BackgroundColor="Transparent" 
+                               FontSize="16"
+                               VerticalOptions="Center"/>
+                    </Grid>
+                </Frame>
+            </ContentView>
+
+            <!-- 3. TRANSACTIONS LIST (White Cards, Dark Text) -->
+            <Label Text="Последние операции" 
+                   FontSize="18" 
+                   FontAttributes="Bold" 
+                   TextColor="#222"
+                   Margin="20,10,20,10"/>
+
+            <CollectionView ItemsSource="{Binding RecentTransactionsDisplay}" 
+                            SelectionMode="None"
+                            BackgroundColor="Transparent"
+                            Margin="0,0,0,20">
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewmodels:TransactionDisplayItem">
+                        <SwipeView>
+                            <!-- Свайп ВЛЕВО (Редактировать - Синий) -->
+                            <SwipeView.LeftItems>
+                                <SwipeItems Mode="Reveal">
+                                    <SwipeItemView BackgroundColor="#1976D2" 
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=EditTransactionCommand}"
+                                                   CommandParameter="{Binding .}">
+                                        <Grid WidthRequest="80" HeightRequest="100">
+                                            <Label Text="✏️" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Grid>
+                                    </SwipeItemView>
+                                </SwipeItems>
+                            </SwipeView.LeftItems>
+
+                            <!-- Свайп ВПРАВО (Удалить - Красный) -->
+                            <SwipeView.RightItems>
+                                <SwipeItems Mode="Reveal">
+                                    <SwipeItemView BackgroundColor="#D32F2F" 
+                                                   Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=DeleteTransactionCommand}"
+                                                   CommandParameter="{Binding .}">
+                                        <Grid WidthRequest="80" HeightRequest="100">
+                                            <Label Text="🗑️" FontSize="24" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        </Grid>
+                                    </SwipeItemView>
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+
+                            <!-- Карточка транзакции -->
+                            <ContentView Padding="20,5,20,5">
+                                <Frame BackgroundColor="White" 
+                                       CornerRadius="15" 
+                                       Padding="15"
+                                       HasShadow="True"
+                                       BorderColor="#F0F0F0">
+
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="15">
+
+                                        <!-- Иконка категории (Круглая, цветная подложка) -->
+                                        <Frame Grid.Column="0" 
+                                               WidthRequest="50" 
+                                               HeightRequest="50" 
+                                               CornerRadius="25"
+                                               BackgroundColor="#F3E5F5"
+                                               Padding="0"
+                                               IsClippedToBounds="True"
+                                               HasShadow="False">
+                                            <Label Text="{Binding CategoryIcon}" 
+                                                   FontSize="24"
+                                                   HorizontalOptions="Center" 
+                                                   VerticalOptions="Center"/>
+                                        </Frame>
+
+                                        <!-- Описание -->
+                                        <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                            <Label Text="{Binding Description}" 
+                                                   FontSize="16" 
+                                                   FontAttributes="Bold"
+                                                   TextColor="#222"
+                                                   LineBreakMode="TailTruncation"/>
+
+                                            <HorizontalStackLayout Spacing="6">
+                                                <Label Text="{Binding CategoryName}" 
+                                                       FontSize="13" 
+                                                       TextColor="#666"/>
+                                                <Label Text="•" FontSize="13" TextColor="#CCC"
+                                                       IsVisible="{Binding AccountName, Converter={StaticResource StringToBoolConverter}}"/>
+                                                <Label Text="{Binding AccountName}" 
+                                                       FontSize="13" 
+                                                       TextColor="#666"
+                                                       IsVisible="{Binding AccountName, Converter={StaticResource StringToBoolConverter}}"/>
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+
+                                        <!-- Сумма -->
+                                        <VerticalStackLayout Grid.Column="2" 
+                                                             HorizontalOptions="End" 
+                                                             Spacing="4"
+                                                             VerticalOptions="Center">
+                                            <Label Text="{Binding FormattedAmount}" 
+                                                   FontSize="18" 
+                                                   FontAttributes="Bold"
+                                                   TextColor="{Binding AmountColor}"
+                                                   HorizontalTextAlignment="End"/>
+
+                                            <Label Text="{Binding Date, StringFormat='{0:dd.MM}'}" 
+                                                   FontSize="12" 
+                                                   TextColor="#999"
+                                                   HorizontalTextAlignment="End"/>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Frame>
+                            </ContentView>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" 
+                                        VerticalOptions="Center" 
+                                        Padding="40"
+                                        Spacing="15">
+                        <Label Text="📭" FontSize="60" HorizontalOptions="Center"/>
+                        <Label Text="Операций нет" 
+                               FontSize="18" 
+                               TextColor="#666" 
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+
+            <!-- Loading indicator -->
+            <ActivityIndicator IsVisible="{Binding IsBusy}" 
+                               IsRunning="{Binding IsBusy}" 
+                               Color="#4A148C"
+                               VerticalOptions="Center"
+                               HorizontalOptions="Center"
+                               Margin="0,20"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

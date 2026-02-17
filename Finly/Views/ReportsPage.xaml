@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Finly.ViewModels"
+             xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
+             xmlns:converters="clr-namespace:Finly.Converters"
+             x:Class="Finly.Views.ReportsPage"
+             x:DataType="viewmodels:ReportsViewModel"
+             Title="Отчеты"
+             BackgroundColor="#F5F7FA">
+
+
+
+    <ScrollView>
+        <VerticalStackLayout Padding="15" Spacing="20">
+
+            <!-- Заголовок -->
+            <Label Text="Финансовая аналитика" FontSize="24" FontAttributes="Bold" TextColor="#222" Margin="0,10,0,5"/>
+
+            <!-- Выбор периода (Удобнее на мобильном) -->
+            <Frame BackgroundColor="White" Padding="15" CornerRadius="12" HasShadow="True">
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="10">
+                    <Label Grid.Row="0" Text="Выберите период:" FontSize="14" TextColor="#666"/>
+                    <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*" ColumnSpacing="10">
+                        <DatePicker Grid.Column="0" Date="{Binding ReportStartDate}" MaximumDate="{Binding ReportEndDate}" TextColor="#333"/>
+                        <Label Grid.Column="1" Text="—" VerticalOptions="Center" TextColor="#999" FontSize="18"/>
+                        <DatePicker Grid.Column="2" Date="{Binding ReportEndDate}" MinimumDate="{Binding ReportStartDate}" TextColor="#333"/>
+                    </Grid>
+                </Grid>
+            </Frame>
+
+            <!-- Карточки итогов -->
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Frame Grid.Column="0" BackgroundColor="#E8F5E9" Padding="10" CornerRadius="12" HasShadow="False" BorderColor="#C8E6C9">
+                    <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                        <Label Text="Доходы" FontSize="12" TextColor="#2E7D32" HorizontalOptions="Center"/>
+                        <Label Text="{Binding CurrentReport.TotalIncome, StringFormat='{0:C}'}" FontSize="16" FontAttributes="Bold" TextColor="#1B5E20" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+                <Frame Grid.Column="1" BackgroundColor="#FFEBEE" Padding="10" CornerRadius="12" HasShadow="False" BorderColor="#FFCDD2">
+                    <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                        <Label Text="Расходы" FontSize="12" TextColor="#C62828" HorizontalOptions="Center"/>
+                        <Label Text="{Binding CurrentReport.TotalExpenses, StringFormat='{0:C}'}" FontSize="16" FontAttributes="Bold" TextColor="#B71C1C" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+                <Frame Grid.Column="2" BackgroundColor="#E3F2FD" Padding="10" CornerRadius="12" HasShadow="False" BorderColor="#BBDEFB">
+                    <VerticalStackLayout Spacing="2" HorizontalOptions="Center">
+                        <Label Text="Сбережения" FontSize="12" TextColor="#1565C0" HorizontalOptions="Center"/>
+                        <Label Text="{Binding CurrentReport.NetSavings, StringFormat='{0:C}'}" FontSize="16" FontAttributes="Bold" TextColor="#0D47A1" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+            </Grid>
+
+            <!-- Блок с графиком -->
+            <Frame BackgroundColor="White" Padding="0" CornerRadius="15" HasShadow="True" IsVisible="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
+                <VerticalStackLayout Spacing="0">
+
+                    <!-- Панель управления графиком (ИСПРАВЛЕНО для мобильных) -->
+                    <Grid Padding="20,20,20,10" ColumnDefinitions="Auto,*" ColumnSpacing="15" BackgroundColor="#FAFAFA">
+                        <Label Grid.Column="0" Text="Тип:" VerticalOptions="Center" FontAttributes="Bold" TextColor="#333"/>
+                        <!-- Picker теперь занимает всё место и имеет явный фон -->
+                        <Picker Grid.Column="1" 
+                                ItemsSource="{Binding ChartTypes}"
+                                SelectedItem="{Binding ChartType}"
+                                Title="Выберите тип"
+                                TextColor="#333"
+                                BackgroundColor="White"
+                                HorizontalOptions="FillAndExpand"/>
+                    </Grid>
+
+                    <!-- Единый холст для всех типов графиков -->
+                    <skia:SKCanvasView x:Name="ChartCanvas" 
+                                       PaintSurface="OnCanvasViewPaintSurface" 
+                                       HeightRequest="300"
+                                       Margin="0,10,0,20"/>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Детализация (показывается если есть данные по категориям) -->
+            <Frame BackgroundColor="White" Padding="20" CornerRadius="15" HasShadow="True"
+                   IsVisible="{Binding HasData}">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Детализация расходов" FontSize="18" FontAttributes="Bold" TextColor="#333"/>
+
+                    <CollectionView ItemsSource="{Binding CurrentReport.CategoryBreakdown}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="viewmodels:CategoryBreakdownItem">
+                                <Grid ColumnDefinitions="Auto,*,Auto" Padding="5,10" ColumnSpacing="15">
+                                    <Frame Grid.Column="0" WidthRequest="40" HeightRequest="40" CornerRadius="20" 
+                                           BackgroundColor="#F3E5F5" Padding="0" IsClippedToBounds="True" HasShadow="False">
+                                        <Label Text="{Binding CategoryIcon}" FontSize="20" HorizontalOptions="Center" VerticalOptions="Center"/>
+                                    </Frame>
+
+                                    <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                                        <Label Text="{Binding CategoryName}" FontSize="15" TextColor="#333"/>
+                                        <Label Text="{Binding Amount, StringFormat='{0:C}'}" FontSize="13" TextColor="#888"/>
+                                    </VerticalStackLayout>
+
+                                    <Label Grid.Column="2" 
+                                           Text="{Binding Percentage, StringFormat='{0:F1}%'}" 
+                                           FontSize="16" FontAttributes="Bold" TextColor="#6200EA"
+                                           VerticalOptions="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Динамика по месяцам (показывается если есть данные по месяцам) -->
+            <Frame BackgroundColor="White" Padding="20" CornerRadius="15" HasShadow="True"
+                   IsVisible="{Binding HasMonthlyData}">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Динамика по месяцам" FontSize="18" FontAttributes="Bold" TextColor="#333"/>
+
+                    <CollectionView ItemsSource="{Binding CurrentReport.MonthlyTrends}">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="viewmodels:MonthlyTrendItem">
+                                <Grid ColumnDefinitions="2*,*,*,*" Padding="5,10" ColumnSpacing="5">
+                                    <Label Grid.Column="0" Text="{Binding MonthName}" FontSize="14" FontAttributes="Bold" TextColor="#333" VerticalOptions="Center"/>
+                                    <Label Grid.Column="1" Text="{Binding Income, StringFormat='{0:C0}'}" FontSize="13" TextColor="Green" VerticalOptions="Center" HorizontalTextAlignment="End"/>
+                                    <Label Grid.Column="2" Text="{Binding Expenses, StringFormat='{0:C0}'}" FontSize="13" TextColor="Red" VerticalOptions="Center" HorizontalTextAlignment="End"/>
+                                    <Label Grid.Column="3" Text="{Binding Savings, StringFormat='{0:C0}'}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center" HorizontalTextAlignment="End">
+                                        <Label.Triggers>
+                                            <DataTrigger TargetType="Label" Binding="{Binding Savings}" Value="0">
+                                                <Setter Property="TextColor" Value="#999"/>
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Frame>
+
+            <VerticalStackLayout>
+                <!-- Кнопка экспорта -->
+                <Button Text="📊 Экспорт отчета" 
+        Command="{Binding ExportReportCommand}" 
+        BackgroundColor="#03A9F4" 
+        TextColor="White" 
+        FontSize="16"
+        CornerRadius="12"
+        HeightRequest="55"
+        IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"/>
+                <Button Text="🔄 Обновить данные" 
+         Command="{Binding GenerateReportCommand}" 
+         BackgroundColor="#6200EA" 
+         TextColor="White" 
+         FontSize="16"
+         CornerRadius="12"
+         HeightRequest="55"
+         IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"/>
+
+            </VerticalStackLayout>
+           
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="#6200EA" HeightRequest="50"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,5 +1,4 @@
-﻿
-using Finly.Models;
+﻿using Finly.Models;
 using SQLite;
 using System;
 using System.Collections.Generic;
@@ -231,7 +230,7 @@ namespace Finly.Services
             }
         }
 
-        // Остальные методы остаются без изменений...
+        // Остальные методы...
         public async Task<ObservableCollection<Category>> GetCategoriesAsync(CategoryType? type = null)
         {
             try
@@ -324,9 +323,42 @@ namespace Finly.Services
             return await _database.UpdateAsync(account);
         }
 
+        // ИЗМЕНЕННЫЙ МЕТОД: при удалении счета удаляем все связанные транзакции
         public async Task<int> DeleteAccountAsync(int id)
         {
-            return await _database.DeleteAsync<Account>(id);
+            try
+            {
+                Debug.WriteLine($"Удаление счета ID: {id} с каскадным удалением транзакций");
+
+                // Начинаем транзакцию для обеспечения целостности данных
+                await _database.RunInTransactionAsync(async (connection) =>
+                {
+                    // Получаем все транзакции, связанные со счетом
+                    var transactions = await _database.Table<Transaction>()
+                        .Where(t => t.AccountId == id)
+                        .ToListAsync();
+
+                    Debug.WriteLine($"Найдено {transactions.Count} транзакций для удаления");
+
+                    // Удаляем все транзакции
+                    foreach (var transaction in transactions)
+                    {
+                        await _database.DeleteAsync(transaction);
+                        Debug.WriteLine($"Удалена транзакция ID: {transaction.Id}");
+                    }
+
+                    // Удаляем сам счет
+                    await _database.DeleteAsync<Account>(id);
+                    Debug.WriteLine($"Счет ID: {id} удален");
+                });
+
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ОШИБКА удаления счета: {ex}");
+                return 0;
+            }
         }
 
         public async Task<ObservableCollection<Budget>> GetBudgetsAsync()
@@ -382,6 +414,7 @@ namespace Finly.Services
 
             return transactions.Sum(t => t.Amount);
         }
+
         public async Task<bool> CheckDatabaseConnection()
         {
             try

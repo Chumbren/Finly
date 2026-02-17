@@ -1,9 +1,10 @@
-﻿using Finly.ViewModels;
+﻿using CommunityToolkit.Maui.Storage;
+using Finly.Models;
+using Finly.ViewModels;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
 using System.Diagnostics;
 using System.Drawing;
-using CommunityToolkit.Maui.Storage;
 using Color = System.Drawing.Color;
 
 namespace Finly.Services
@@ -29,18 +30,40 @@ namespace Finly.Services
                 if (reportType == "Текущий отчет" || reportType == "Полный отчет за период")
                 {
                     CreateSummarySheet(package, report, startDate, endDate);
-                    CreateCategoriesSheet(package, report);
+
+                    // Доходы
+                    if (report.IncomeBreakdown?.Count > 0)
+                        CreateIncomeSheet(package, report);
+
+                    // Расходы
+                    if (report.ExpenseBreakdown?.Count > 0)
+                        CreateExpenseSheet(package, report);
 
                     if (report.MonthlyTrends?.Count > 0)
                         CreateTrendsSheet(package, report);
+
+                    // ВСЕГДА добавляем лист с транзакциями для полного отчета
+                    if (report.Transactions?.Count > 0)
+                        CreateTransactionsSheet(package, report);
                 }
                 else if (reportType == "Только график")
                 {
-                    CreateCategoriesSheet(package, report);
+                    if (report.ExpenseBreakdown?.Count > 0)
+                        CreateExpenseSheet(package, report);
+                    if (report.IncomeBreakdown?.Count > 0)
+                        CreateIncomeSheet(package, report);
                 }
                 else if (reportType == "Детализация по категориям")
                 {
-                    CreateCategoriesSheet(package, report);
+                    if (report.ExpenseBreakdown?.Count > 0)
+                        CreateExpenseSheet(package, report);
+                    if (report.IncomeBreakdown?.Count > 0)
+                        CreateIncomeSheet(package, report);
+                }
+                else if (reportType == "Все операции")
+                {
+                    if (report.Transactions?.Count > 0)
+                        CreateTransactionsSheet(package, report);
                 }
 
                 // Сохраняем файл
@@ -97,6 +120,11 @@ namespace Finly.Services
             sheet.Cells["B7"].Style.Numberformat.Format = "#,##0.00 ₽";
             sheet.Cells["B7"].Style.Font.Color.SetColor(report.NetSavings >= 0 ? Color.Green : Color.Red);
 
+            // Количество операций
+            sheet.Cells["A9"].Value = "Всего операций:";
+            sheet.Cells["B9"].Value = report.Transactions?.Count ?? 0;
+            sheet.Cells["A9:B9"].Style.Font.Bold = true;
+
             // Итоговая строка
             sheet.Cells["A8:B8"].Style.Font.Bold = true;
             sheet.Cells["A8:B8"].Style.Border.Top.Style = ExcelBorderStyle.Thin;
@@ -111,18 +139,18 @@ namespace Finly.Services
             sheet.Cells["A10:C10"].Merge = true;
         }
 
-        private void CreateCategoriesSheet(ExcelPackage package, ReportData report)
+        private void CreateIncomeSheet(ExcelPackage package, ReportData report)
         {
-            if (report.CategoryBreakdown?.Count == 0)
+            if (report.IncomeBreakdown?.Count == 0)
                 return;
 
-            var sheet = package.Workbook.Worksheets.Add("Категории");
+            var sheet = package.Workbook.Worksheets.Add("Доходы");
 
             // Заголовок
-            sheet.Cells["A1"].Value = "Детализация по категориям";
+            sheet.Cells["A1"].Value = "Детализация доходов";
             sheet.Cells["A1"].Style.Font.Size = 16;
             sheet.Cells["A1"].Style.Font.Bold = true;
-            sheet.Cells["A1"].Style.Font.Color.SetColor(Color.FromArgb(98, 0, 234));
+            sheet.Cells["A1"].Style.Font.Color.SetColor(Color.FromArgb(46, 125, 50)); // Темно-зеленый
             sheet.Cells["A1:D1"].Merge = true;
 
             // Заголовки таблицы
@@ -133,14 +161,14 @@ namespace Finly.Services
                 cell.Value = headers[i];
                 cell.Style.Font.Bold = true;
                 cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                cell.Style.Fill.BackgroundColor.SetColor(Color.FromArgb(98, 0, 234));
+                cell.Style.Fill.BackgroundColor.SetColor(Color.FromArgb(46, 125, 50));
                 cell.Style.Font.Color.SetColor(Color.White);
                 cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
             }
 
             // Данные
             int row = 4;
-            foreach (var item in report.CategoryBreakdown)
+            foreach (var item in report.IncomeBreakdown)
             {
                 sheet.Cells[row, 1].Value = row - 3;
                 sheet.Cells[row, 2].Value = item.CategoryName;
@@ -156,7 +184,7 @@ namespace Finly.Services
                 if ((row - 4) % 2 == 0)
                 {
                     sheet.Cells[row, 1, row, 4].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    sheet.Cells[row, 1, row, 4].Style.Fill.BackgroundColor.SetColor(Color.FromArgb(245, 245, 245));
+                    sheet.Cells[row, 1, row, 4].Style.Fill.BackgroundColor.SetColor(Color.FromArgb(232, 245, 233)); // Светло-зеленый
                 }
 
                 row++;
@@ -166,7 +194,7 @@ namespace Finly.Services
             sheet.Cells[row, 2].Value = "ИТОГО:";
             sheet.Cells[row, 2].Style.Font.Bold = true;
 
-            var totalSum = report.CategoryBreakdown.Sum(c => c.Amount);
+            var totalSum = report.IncomeBreakdown.Sum(c => c.Amount);
             sheet.Cells[row, 3].Value = totalSum;
             sheet.Cells[row, 3].Style.Numberformat.Format = "#,##0.00 ₽";
             sheet.Cells[row, 3].Style.Font.Bold = true;
@@ -177,17 +205,74 @@ namespace Finly.Services
 
             // Форматирование
             sheet.Cells[sheet.Dimension.Address].AutoFitColumns();
+        }
 
-            // Добавляем примечание о больших числах
-            if (report.CategoryBreakdown.Any(c => Math.Abs(c.Amount) >= 1_000_000))
+        private void CreateExpenseSheet(ExcelPackage package, ReportData report)
+        {
+            if (report.ExpenseBreakdown?.Count == 0)
+                return;
+
+            var sheet = package.Workbook.Worksheets.Add("Расходы");
+
+            // Заголовок
+            sheet.Cells["A1"].Value = "Детализация расходов";
+            sheet.Cells["A1"].Style.Font.Size = 16;
+            sheet.Cells["A1"].Style.Font.Bold = true;
+            sheet.Cells["A1"].Style.Font.Color.SetColor(Color.FromArgb(198, 40, 40)); // Темно-красный
+            sheet.Cells["A1:D1"].Merge = true;
+
+            // Заголовки таблицы
+            var headers = new[] { "№", "Категория", "Сумма", "%" };
+            for (int i = 0; i < headers.Length; i++)
             {
-                row += 2;
-                sheet.Cells[row, 1].Value = "* Все суммы указаны в рублях. Большие числа могут быть сокращены в отображении, но сохранены полностью.";
-                sheet.Cells[row, 1, row, 4].Merge = true;
-                sheet.Cells[row, 1].Style.Font.Size = 9;
-                sheet.Cells[row, 1].Style.Font.Italic = true;
-                sheet.Cells[row, 1].Style.Font.Color.SetColor(Color.Gray);
+                var cell = sheet.Cells[3, i + 1];
+                cell.Value = headers[i];
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                cell.Style.Fill.BackgroundColor.SetColor(Color.FromArgb(198, 40, 40));
+                cell.Style.Font.Color.SetColor(Color.White);
+                cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
             }
+
+            // Данные
+            int row = 4;
+            foreach (var item in report.ExpenseBreakdown)
+            {
+                sheet.Cells[row, 1].Value = row - 3;
+                sheet.Cells[row, 2].Value = item.CategoryName;
+                sheet.Cells[row, 3].Value = item.Amount;
+                sheet.Cells[row, 3].Style.Numberformat.Format = "#,##0.00 ₽";
+                sheet.Cells[row, 3].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
+
+                sheet.Cells[row, 4].Value = item.Percentage / 100;
+                sheet.Cells[row, 4].Style.Numberformat.Format = "0.00%";
+                sheet.Cells[row, 4].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
+
+                // Чередование фона
+                if ((row - 4) % 2 == 0)
+                {
+                    sheet.Cells[row, 1, row, 4].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    sheet.Cells[row, 1, row, 4].Style.Fill.BackgroundColor.SetColor(Color.FromArgb(255, 235, 238)); // Светло-красный
+                }
+
+                row++;
+            }
+
+            // Итог
+            sheet.Cells[row, 2].Value = "ИТОГО:";
+            sheet.Cells[row, 2].Style.Font.Bold = true;
+
+            var totalSum = report.ExpenseBreakdown.Sum(c => c.Amount);
+            sheet.Cells[row, 3].Value = totalSum;
+            sheet.Cells[row, 3].Style.Numberformat.Format = "#,##0.00 ₽";
+            sheet.Cells[row, 3].Style.Font.Bold = true;
+
+            sheet.Cells[row, 4].Value = 1.0;
+            sheet.Cells[row, 4].Style.Numberformat.Format = "0.00%";
+            sheet.Cells[row, 4].Style.Font.Bold = true;
+
+            // Форматирование
+            sheet.Cells[sheet.Dimension.Address].AutoFitColumns();
         }
 
         private void CreateTrendsSheet(ExcelPackage package, ReportData report)
@@ -271,6 +356,110 @@ namespace Finly.Services
 
             // Автоширина
             sheet.Cells[sheet.Dimension.Address].AutoFitColumns();
+        }
+
+        private void CreateTransactionsSheet(ExcelPackage package, ReportData report)
+        {
+            if (report.Transactions?.Count == 0)
+                return;
+
+            var sheet = package.Workbook.Worksheets.Add("Операции");
+
+            // Заголовок
+            sheet.Cells["A1"].Value = "Все операции за период";
+            sheet.Cells["A1"].Style.Font.Size = 16;
+            sheet.Cells["A1"].Style.Font.Bold = true;
+            sheet.Cells["A1"].Style.Font.Color.SetColor(Color.FromArgb(98, 0, 234));
+            sheet.Cells["A1:G1"].Merge = true;
+
+            sheet.Cells["A2"].Value = $"Всего операций: {report.Transactions.Count}";
+            sheet.Cells["A2"].Style.Font.Size = 12;
+            sheet.Cells["A2"].Style.Font.Color.SetColor(Color.Gray);
+            sheet.Cells["A2:G2"].Merge = true;
+
+            // Заголовки таблицы
+            var headers = new[] { "№", "Дата", "Тип", "Категория", "Счет", "Описание", "Сумма" };
+            for (int i = 0; i < headers.Length; i++)
+            {
+                var cell = sheet.Cells[4, i + 1];
+                cell.Value = headers[i];
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                cell.Style.Fill.BackgroundColor.SetColor(Color.FromArgb(98, 0, 234));
+                cell.Style.Font.Color.SetColor(Color.White);
+                cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+            }
+
+            // Данные
+            int row = 5;
+            foreach (var item in report.Transactions.OrderByDescending(t => t.Date))
+            {
+                sheet.Cells[row, 1].Value = row - 4;
+
+                // Дата
+                sheet.Cells[row, 2].Value = item.Date;
+                sheet.Cells[row, 2].Style.Numberformat.Format = "dd.MM.yyyy HH:mm";
+
+                // Тип
+                sheet.Cells[row, 3].Value = item.Type == TransactionType.Income ? "Доход" : "Расход";
+                sheet.Cells[row, 3].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+
+                // Категория
+                sheet.Cells[row, 4].Value = item.CategoryName;
+
+                // Счет
+                sheet.Cells[row, 5].Value = item.AccountName;
+
+                // Описание
+                sheet.Cells[row, 6].Value = item.Description;
+
+                // Сумма
+                sheet.Cells[row, 7].Value = item.Amount;
+                sheet.Cells[row, 7].Style.Numberformat.Format = "#,##0.00 ₽";
+                sheet.Cells[row, 7].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
+                sheet.Cells[row, 7].Style.Font.Color.SetColor(
+                    item.Type == TransactionType.Income ? Color.Green : Color.Red);
+
+                // Чередование фона
+                if ((row - 5) % 2 == 0)
+                {
+                    sheet.Cells[row, 1, row, 7].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    sheet.Cells[row, 1, row, 7].Style.Fill.BackgroundColor.SetColor(Color.FromArgb(245, 245, 245));
+                }
+
+                row++;
+            }
+
+            // Итог
+            sheet.Cells[row, 6].Value = "ИТОГО:";
+            sheet.Cells[row, 6].Style.Font.Bold = true;
+
+            var totalIncome = report.Transactions
+                .Where(t => t.Type == TransactionType.Income)
+                .Sum(t => t.Amount);
+            var totalExpenses = report.Transactions
+                .Where(t => t.Type == TransactionType.Expense)
+                .Sum(t => t.Amount);
+
+            sheet.Cells[row, 7].Value = totalIncome - totalExpenses;
+            sheet.Cells[row, 7].Style.Numberformat.Format = "#,##0.00 ₽";
+            sheet.Cells[row, 7].Style.Font.Bold = true;
+            sheet.Cells[row, 7].Style.Font.Color.SetColor(
+                totalIncome - totalExpenses >= 0 ? Color.Green : Color.Red);
+
+            // Автоширина
+            sheet.Cells[sheet.Dimension.Address].AutoFitColumns();
+
+            // Добавляем примечание о больших числах
+            if (report.Transactions.Any(t => Math.Abs(t.Amount) >= 1_000_000))
+            {
+                row += 2;
+                sheet.Cells[row, 1].Value = "* Все суммы указаны в рублях. Большие числа могут быть сокращены в отображении, но сохранены полностью.";
+                sheet.Cells[row, 1, row, 7].Merge = true;
+                sheet.Cells[row, 1].Style.Font.Size = 9;
+                sheet.Cells[row, 1].Style.Font.Italic = true;
+                sheet.Cells[row, 1].Style.Font.Color.SetColor(Color.Gray);
+            }
         }
 
         private async Task<bool> SaveExcelFile(ExcelPackage package, string fileName)

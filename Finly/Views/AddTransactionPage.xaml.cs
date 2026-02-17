@@ -6,13 +6,12 @@ using System.Diagnostics;
 namespace Finly.Views
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
-    [QueryProperty(nameof(TransactionId), nameof(TransactionId))] // 🔑 Обязательно для получения параметров
+    [QueryProperty(nameof(TransactionId), nameof(TransactionId))]
     public partial class AddTransactionPage : ContentPage
     {
         private readonly AddTransactionViewModel _viewModel;
         private int? _transactionId;
 
-        // 🔑 Свойство для получения параметра из URL
         public string TransactionId
         {
             set
@@ -34,7 +33,6 @@ namespace Finly.Views
         {
             base.OnNavigatedTo(args);
 
-            // 🔑 Загружаем данные в зависимости от наличия TransactionId
             if (_transactionId.HasValue)
             {
                 _viewModel.LoadDataCommand.Execute(_transactionId.Value);
@@ -43,6 +41,34 @@ namespace Finly.Views
             {
                 _viewModel.LoadDataCommand.Execute(null);
             }
+        }
+
+        private void OnAmountTextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is Entry entry)
+            {
+                _viewModel.UpdateAmountValidation(entry.Text);
+            }
+        }
+
+        private void OnDescriptionTextChanged(object sender, TextChangedEventArgs e)
+        {
+            _viewModel.UpdateDescriptionValidation();
+        }
+
+        private void OnCategorySelected(object sender, EventArgs e)
+        {
+            _viewModel.UpdateCategoryValidation();
+        }
+
+        private void OnAccountSelected(object sender, EventArgs e)
+        {
+            _viewModel.UpdateAccountValidation();
+        }
+
+        private void OnDateSelected(object sender, DateChangedEventArgs e)
+        {
+            _viewModel.UpdateDateValidation();
         }
     }
 }

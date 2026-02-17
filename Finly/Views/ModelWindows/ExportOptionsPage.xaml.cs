@@ -1,6 +1,6 @@
 using Finly.ViewModels;
 
-namespace Finly.Views;
+namespace Finly.Views.ModelWindows;
 
 public partial class ExportOptionsPage : ContentPage
 {

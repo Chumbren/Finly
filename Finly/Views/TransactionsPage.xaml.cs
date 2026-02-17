@@ -1,4 +1,4 @@
-using Finly.ViewModels;
+п»їusing Finly.ViewModels;
 
 namespace Finly.Views;
 
@@ -17,7 +17,7 @@ public partial class TransactionsPage : ContentPage
     {
         base.OnAppearing();
 
-        // Установка максимальной даты (обход ошибки XLS0414)
+        // РЈСЃС‚Р°РЅРѕРІРєР° РјР°РєСЃРёРјР°Р»СЊРЅРѕР№ РґР°С‚С‹ (РѕР±С…РѕРґ РѕС€РёР±РєРё XLS0414)
         var today = DateTime.Today;
         _viewModel.StartDate = today.AddDays(-30);
         _viewModel.EndDate = today;

@@ -2,13 +2,15 @@
 using CommunityToolkit.Mvvm.Input;
 using Finly.Services;
 using Finly.Views;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace Finly.ViewModels;
 
 public partial class ExportOptionsViewModel : ObservableObject
 {
     private readonly IPdfExportService _pdfExportService;
-    private readonly IExcelExportService _excelExportService; // Добавляем
+    private readonly IExcelExportService _excelExportService;
     private ReportsViewModel _reportsViewModel;
 
     [ObservableProperty]
@@ -17,10 +19,19 @@ public partial class ExportOptionsViewModel : ObservableObject
     [ObservableProperty]
     private string _selectedFormat = "PDF";
 
+    [ObservableProperty]
+    private ObservableCollection<string> _reportTypes = new()
+    {
+        "Текущий отчет",
+        "Только график",
+        "Детализация по категориям",
+        "Все операции",
+        "Полный отчет за период"
+    };
+
     public IRelayCommand CloseCommand { get; }
     public IRelayCommand ExportCommand { get; }
 
-    // Обновляем конструктор
     public ExportOptionsViewModel(IPdfExportService pdfExportService, IExcelExportService excelExportService)
     {
         _pdfExportService = pdfExportService;
@@ -31,7 +42,6 @@ public partial class ExportOptionsViewModel : ObservableObject
         ExportCommand = new RelayCommand(Export);
     }
 
-    // Метод инициализации (вызывается после создания через DI)
     public void Initialize(ReportsViewModel reportsViewModel)
     {
         _reportsViewModel = reportsViewModel;
@@ -44,6 +54,10 @@ public partial class ExportOptionsViewModel : ObservableObject
 
     private async void Export()
     {
+        try
+        {
+            Debug.WriteLine($"Экспорт: Формат={SelectedFormat}, Тип отчета={SelectedReportType}");
+
             // Закрываем модальное окно
             await Shell.Current.Navigation.PopModalAsync();
 
@@ -57,6 +71,7 @@ public partial class ExportOptionsViewModel : ObservableObject
 
             if (SelectedFormat == "PDF")
             {
+                Debug.WriteLine("Экспорт в PDF...");
                 success = await _pdfExportService.ExportReportToPdfAsync(
                     _reportsViewModel.CurrentReport,
                     _reportsViewModel.ReportStartDate,
@@ -66,6 +81,7 @@ public partial class ExportOptionsViewModel : ObservableObject
             }
             else if (SelectedFormat == "Excel")
             {
+                Debug.WriteLine("Экспорт в Excel...");
                 success = await _excelExportService.ExportReportToExcelAsync(
                     _reportsViewModel.CurrentReport,
                     _reportsViewModel.ReportStartDate,
@@ -76,8 +92,20 @@ public partial class ExportOptionsViewModel : ObservableObject
 
             if (!success)
             {
+                Debug.WriteLine("Экспорт не удался");
                 await Shell.Current.DisplayAlertAsync("Ошибка",
                     "Не удалось выполнить экспорт", "OK");
             }
+            else
+            {
+                Debug.WriteLine("Экспорт успешно выполнен");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Ошибка в Export: {ex.Message}");
+            await Shell.Current.DisplayAlertAsync("Ошибка",
+                $"Ошибка экспорта: {ex.Message}", "OK");
+        }
     }
 }

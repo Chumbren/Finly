@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using Finly.Models;
@@ -8,15 +9,56 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Account = Finly.Models.Account;
 
 namespace Finly.ViewModels
 {
     public partial class MainViewModel : ObservableObject, IRecipient<DataChangedMessage>
     {
         private readonly IDataService _dataService;
+        private Account _selectedAccount;
+
+        [ObservableProperty]
+        private bool _isPopupVisible;
+
+        [RelayCommand]
+        private void ShowAccountSelector()
+        {
+            IsPopupVisible = true;
+        }
+
+        [RelayCommand]
+        private void ClosePopup()
+        {
+            IsPopupVisible = false;
+        }
+
+        [RelayCommand]
+        private async Task SelectAccount(Account account)
+        {
+            CurrentAccount = account;
+            await LoadDataForSelectedAccount();
+            SelectedAccountName = account?.Name ?? "Все счета";
+            IsPopupVisible = false;
+        }
+
+        [RelayCommand]
+        private async Task ShowAllAccounts()
+        {
+            CurrentAccount = null;
+            await LoadDataForSelectedAccount();
+            SelectedAccountName = "Все счета";
+            IsPopupVisible = false;
+        }
 
         [ObservableProperty]
         private decimal _totalBalance;
+
+        [ObservableProperty]
+        private decimal _totalIncome;
+
+        [ObservableProperty]
+        private decimal _totalExpenses;
 
         [ObservableProperty]
         private decimal _todayIncome;
@@ -29,6 +71,15 @@ namespace Finly.ViewModels
 
         [ObservableProperty]
         private ObservableCollection<TransactionDisplayItem> _recentTransactionsDisplay = new();
+
+        [ObservableProperty]
+        private ObservableCollection<Account> _accounts = new();
+
+        [ObservableProperty]
+        private Account _currentAccount;
+
+        [ObservableProperty]
+        private string _selectedAccountName = "Все счета";
 
         public MainViewModel(IDataService dataService)
         {
@@ -65,59 +116,14 @@ namespace Finly.ViewModels
             {
                 Debug.WriteLine("=== ЗАГРУЗКА ДАННЫХ ДАШБОРДА ===");
 
-                // Проверяем все транзакции в БД
-                var allTransactions = await _dataService.GetTransactionsAsync();
-                Debug.WriteLine($"Всего транзакций в БД: {allTransactions.Count}");
+                // Загружаем все счета
+                Accounts = await _dataService.GetAccountsAsync();
+                Debug.WriteLine($"Загружено счетов: {Accounts.Count}");
 
-                foreach (var t in allTransactions)
-                {
-                    Debug.WriteLine($"Транзакция ID:{t.Id}, Дата:{t.Date:dd.MM.yyyy}, Сумма:{t.Amount}, Тип:{t.Type}, Описание:{t.Description}");
-                }
+                // Если нет выбранного счета, показываем все
+                await LoadDataForSelectedAccount();
 
-                // Загрузка последних операций (за 30 дней для теста)
-                var transactions = await _dataService.GetTransactionsAsync(
-                    DateTime.Today.AddDays(-30),
-                    DateTime.Today.AddDays(1)); // +1 день чтобы включить сегодня
-
-                Debug.WriteLine($"Транзакций за 30 дней: {transactions?.Count ?? 0}");
-
-                // Загрузка всех категорий и счетов для сопоставления
-                var categories = await _dataService.GetCategoriesAsync();
-                var accounts = await _dataService.GetAccountsAsync();
-
-                Debug.WriteLine($"Категорий: {categories?.Count ?? 0}, Счетов: {accounts?.Count ?? 0}");
-
-                // Очищаем существующую коллекцию
-                RecentTransactionsDisplay.Clear();
-
-                foreach (var transaction in transactions)
-                {
-                    var category = categories.FirstOrDefault(c => c.Id == transaction.CategoryId)
-                                ?? new Category { Name = "Без категории", Icon = "❓", Color = "#9E9E9E" };
-
-                    var account = accounts.FirstOrDefault(a => a.Id == transaction.AccountId)
-                               ?? new Account { Name = "Неизвестный счет" };
-
-                    RecentTransactionsDisplay.Add(new TransactionDisplayItem
-                    {
-                        Transaction = transaction,
-                        Category = category,
-                        Account = account
-                    });
-
-                    Debug.WriteLine($"Добавлен элемент: {transaction.Description} - {transaction.Amount} ({category.Name})");
-                }
-
-                Debug.WriteLine($"Отображаемых элементов: {RecentTransactionsDisplay.Count}");
-
-                // Расчет общего баланса (только активные счета)
-                TotalBalance = accounts.Where(a => a.IsActive).Sum(a => a.Balance);
-
-                // Сегодняшняя статистика
-                TodayIncome = await _dataService.GetTotalIncomeAsync(DateTime.Today, DateTime.Today);
-                TodayExpenses = await _dataService.GetTotalExpensesAsync(DateTime.Today, DateTime.Today);
-
-                Debug.WriteLine($"Баланс: {TotalBalance}, Доход сегодня: {TodayIncome}, Расход сегодня: {TodayExpenses}");
+                Debug.WriteLine($"Баланс: {TotalBalance}, Доход всего: {TotalIncome}, Расход всего: {TotalExpenses}");
             }
             catch (System.Exception ex)
             {
@@ -128,6 +134,96 @@ namespace Finly.ViewModels
                 IsBusy = false;
             }
         }
+
+        private async Task LoadDataForSelectedAccount()
+        {
+            // Определяем даты для статистики "за все время" (используем минимальную дату)
+            DateTime startDate = new DateTime(2000, 1, 1);
+            DateTime endDate = DateTime.Today.AddDays(1);
+
+            // Загрузка транзакций
+            var allTransactions = await _dataService.GetTransactionsAsync(startDate, endDate);
+            Debug.WriteLine($"Всего транзакций в БД: {allTransactions.Count}");
+
+            // Фильтруем по выбранному счету если нужно
+            var filteredTransactions = allTransactions;
+            if (CurrentAccount != null)
+            {
+                filteredTransactions = new ObservableCollection<Models.Transaction>(
+                    allTransactions.Where(t => t.AccountId == CurrentAccount.Id)
+                );
+                SelectedAccountName = CurrentAccount.Name;
+            }
+            else
+            {
+                SelectedAccountName = "Все счета";
+            }
+
+            Debug.WriteLine($"Транзакций после фильтрации: {filteredTransactions.Count}");
+
+            // Загрузка всех категорий для сопоставления
+            var categories = await _dataService.GetCategoriesAsync();
+
+            // Очищаем существующую коллекцию
+            RecentTransactionsDisplay.Clear();
+
+            // Берем последние 10 транзакций
+            foreach (var transaction in filteredTransactions.OrderByDescending(t => t.Date).Take(10))
+            {
+                var category = categories.FirstOrDefault(c => c.Id == transaction.CategoryId)
+                            ?? new Category { Name = "Без категории", Icon = "❓", Color = "#9E9E9E" };
+
+                var account = Accounts.FirstOrDefault(a => a.Id == transaction.AccountId)
+                           ?? new Account { Name = "Неизвестный счет" };
+
+                RecentTransactionsDisplay.Add(new TransactionDisplayItem
+                {
+                    Transaction = transaction,
+                    Category = category,
+                    Account = account
+                });
+            }
+
+            Debug.WriteLine($"Отображаемых элементов: {RecentTransactionsDisplay.Count}");
+
+            // Расчет общего баланса (только активные счета)
+            if (CurrentAccount != null)
+            {
+                TotalBalance = CurrentAccount.Balance;
+            }
+            else
+            {
+                TotalBalance = Accounts.Where(a => a.IsActive).Sum(a => a.Balance);
+            }
+
+            // Статистика за все время
+            if (CurrentAccount != null)
+            {
+                TotalIncome = filteredTransactions
+                    .Where(t => t.Type == TransactionType.Income)
+                    .Sum(t => t.Amount);
+                TotalExpenses = filteredTransactions
+                    .Where(t => t.Type == TransactionType.Expense)
+                    .Sum(t => t.Amount);
+            }
+            else
+            {
+                TotalIncome = await _dataService.GetTotalIncomeAsync(startDate, endDate);
+                TotalExpenses = await _dataService.GetTotalExpensesAsync(startDate, endDate);
+            }
+
+            // Сегодняшняя статистика
+            TodayIncome = filteredTransactions
+                .Where(t => t.Type == TransactionType.Income && t.Date.Date == DateTime.Today)
+                .Sum(t => t.Amount);
+            TodayExpenses = filteredTransactions
+                .Where(t => t.Type == TransactionType.Expense && t.Date.Date == DateTime.Today)
+                .Sum(t => t.Amount);
+        }
+
+       
+
+        
 
         [RelayCommand]
         private async Task NavigateToPage(string pageName)
@@ -152,7 +248,6 @@ namespace Finly.ViewModels
             await Shell.Current.GoToAsync($"///{nameof(AddTransactionPage)}");
         }
 
-        // НОВЫЙ МЕТОД: Редактирование транзакции
         [RelayCommand]
         private async Task EditTransaction(TransactionDisplayItem displayItem)
         {
@@ -162,13 +257,11 @@ namespace Finly.ViewModels
             await Shell.Current.GoToAsync($"{nameof(AddTransactionPage)}?TransactionId={displayItem.Transaction.Id}");
         }
 
-        // НОВЫЙ МЕТОД: Удаление транзакции с подтверждением
         [RelayCommand]
         private async Task DeleteTransaction(TransactionDisplayItem displayItem)
         {
             if (displayItem?.Transaction == null) return;
 
-            // Запрашиваем подтверждение
             bool confirm = await Shell.Current.DisplayAlertAsync(
                 "Подтверждение удаления",
                 $"Вы уверены, что хотите удалить операцию '{displayItem.Description}' на сумму {displayItem.FormattedAmount}?",
@@ -182,14 +275,12 @@ namespace Finly.ViewModels
             {
                 Debug.WriteLine($"DeleteTransaction: Удаление транзакции ID {displayItem.Transaction.Id}");
 
-                // Удаляем через DataService
                 int result = await _dataService.DeleteTransactionAsync(displayItem.Transaction.Id);
 
                 if (result > 0)
                 {
                     Debug.WriteLine("Транзакция успешно удалена");
 
-                    // Отправляем сообщение об изменении данных
                     WeakReferenceMessenger.Default.Send(new DataChangedMessage
                     {
                         EntityType = "Transaction",
@@ -197,7 +288,6 @@ namespace Finly.ViewModels
                         ChangeType = ChangeType.Deleted
                     });
 
-                    // Показываем уведомление об успехе
                     await Shell.Current.DisplayAlertAsync("Успех", "Операция удалена", "OK");
                 }
                 else
@@ -217,7 +307,6 @@ namespace Finly.ViewModels
             }
         }
     }
-
     public partial class TransactionDisplayItem : ObservableObject
     {
         [ObservableProperty]

@@ -1,8 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Finly.Models;
 using Finly.Services;
 using Finly.Views;
+using Finly.Views.ModelWindows;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -15,17 +17,22 @@ namespace Finly.ViewModels
 {
     public partial class ReportsViewModel : ObservableObject
     {
-public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
+        public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
+        public bool HasTransactions => CurrentReport?.Transactions?.Count > 0;
+        public bool HasIncomeData => CurrentReport?.IncomeBreakdown?.Count > 0;
+        public bool HasExpenseData => CurrentReport?.ExpenseBreakdown?.Count > 0;
 
         private readonly IDataService _dataService;
         private readonly IPdfExportService _pdfExportService;
         private readonly IServiceProvider _serviceProvider;
 
-        // Также нужно обновить уведомления при изменении CurrentReport
         partial void OnCurrentReportChanged(ReportData value)
         {
             OnPropertyChanged(nameof(HasData));
             OnPropertyChanged(nameof(HasMonthlyData));
+            OnPropertyChanged(nameof(HasTransactions));
+            OnPropertyChanged(nameof(HasIncomeData));
+            OnPropertyChanged(nameof(HasExpenseData));
         }
 
         [ObservableProperty]
@@ -46,31 +53,82 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
         [ObservableProperty]
         private bool _hasData;
 
-        // Доступные типы диаграмм
         [ObservableProperty]
-        private ObservableCollection<string> _chartTypes = new() { "Круговая", "Столбчатая", "Линейный график" };
+        private ObservableCollection<string> _chartTypes = new() { "Круговая", "Столбчатая" };
 
+        // Поиск по операциям
+        [ObservableProperty]
+        private string _searchQuery = string.Empty;
+
+        [ObservableProperty]
+        private ObservableCollection<TransactionDisplayItem> _filteredTransactions = new();
+
+        // Для отображения в каком формате показывать числа
+        [ObservableProperty]
+        private string _amountDisplayMode = "Обычный"; // "Обычный", "Тысячи", "Миллионы", "Миллиарды"
 
         public ReportsViewModel(
-     IDataService dataService,
-     IPdfExportService pdfExportService,
-     IServiceProvider serviceProvider)  // Добавляем IServiceProvider
+            IDataService dataService,
+            IPdfExportService pdfExportService,
+            IServiceProvider serviceProvider)
         {
             _dataService = dataService;
             _pdfExportService = pdfExportService;
             _serviceProvider = serviceProvider;
 
-            HasData = CurrentReport?.CategoryBreakdown?.Count > 0;
+            // ИСПРАВЛЕНО: заменяем CategoryBreakdown на проверку IncomeBreakdown и ExpenseBreakdown
+            HasData = (CurrentReport?.IncomeBreakdown?.Count > 0) || (CurrentReport?.ExpenseBreakdown?.Count > 0);
 
-            // Подписка на изменения
             PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(CurrentReport))
                 {
                     OnPropertyChanged(nameof(HasData));
                     OnPropertyChanged(nameof(HasMonthlyData));
+                    OnPropertyChanged(nameof(HasTransactions));
+                    OnPropertyChanged(nameof(HasIncomeData));
+                    OnPropertyChanged(nameof(HasExpenseData));
+
+                    // Обновляем отфильтрованные транзакции
+                    FilterTransactions();
+
+                    // Определяем режим отображения чисел
+                    DetermineAmountDisplayMode();
                 }
             };
+        }
+
+        // Определяем режим отображения чисел на основе максимальной суммы
+        private void DetermineAmountDisplayMode()
+        {
+            if (CurrentReport == null) return;
+
+            var maxAmount = Math.Max(
+                CurrentReport.TotalIncome,
+                CurrentReport.TotalExpenses
+            );
+
+            if (maxAmount >= 1_000_000_000)
+                AmountDisplayMode = "Миллиарды";
+            else if (maxAmount >= 1_000_000)
+                AmountDisplayMode = "Миллионы";
+            else if (maxAmount >= 1_000)
+                AmountDisplayMode = "Тысячи";
+            else
+                AmountDisplayMode = "Обычный";
+        }
+
+        // Форматирование больших чисел
+        public string FormatLargeAmount(decimal amount)
+        {
+            if (AmountDisplayMode == "Миллиарды")
+                return $"{amount / 1_000_000_000m:F2} млрд ₽";
+            else if (AmountDisplayMode == "Миллионы")
+                return $"{amount / 1_000_000m:F2} млн ₽";
+            else if (AmountDisplayMode == "Тысячи")
+                return $"{amount / 1_000m:F2} тыс ₽";
+            else
+                return amount.ToString("C0");
         }
 
         // Команда экспорта с правильным DI
@@ -79,18 +137,12 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
         {
             if (IsBusy) return;
 
-           
-                // Создаем ExportOptionsViewModel через DI
-                var exportViewModel = _serviceProvider.GetRequiredService<ExportOptionsViewModel>();
+            var exportViewModel = _serviceProvider.GetRequiredService<ExportOptionsViewModel>();
+            exportViewModel.Initialize(this);
 
-                // Передаем текущий отчет через свойство или метод
-                exportViewModel.Initialize(this);
-
-                var exportPage = new ExportOptionsPage(exportViewModel);
-                await Shell.Current.Navigation.PushModalAsync(exportPage);
-            
+            var exportPage = new ExportOptionsPage(exportViewModel);
+            await Shell.Current.Navigation.PushModalAsync(exportPage);
         }
-
 
         [RelayCommand]
         private async Task GenerateReport()
@@ -107,7 +159,8 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
                 Debug.WriteLine($"Получено транзакций: {transactions?.Count() ?? 0}");
 
                 var categories = await _dataService.GetCategoriesAsync();
-                Debug.WriteLine($"Получено категорий: {categories?.Count() ?? 0}");
+                var accounts = await _dataService.GetAccountsAsync();
+                Debug.WriteLine($"Получено категорий: {categories?.Count() ?? 0}, счетов: {accounts?.Count() ?? 0}");
 
                 // Создаем новый объект ReportData
                 var newReport = new ReportData();
@@ -118,8 +171,41 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
 
                 Debug.WriteLine($"Доходы: {newReport.TotalIncome}, Расходы: {newReport.TotalExpenses}, Сбережения: {newReport.NetSavings}");
 
-                // Category breakdown
-                var categoryBreakdown = new List<CategoryBreakdownItem>();
+                // Детализация доходов по категориям
+                var incomeBreakdown = new List<CategoryBreakdownItem>();
+                var totalIncome = newReport.TotalIncome;
+
+                if (totalIncome > 0)
+                {
+                    var incomeCategories = categories.Where(c => c.Type == CategoryType.Income).ToList();
+
+                    foreach (var category in incomeCategories)
+                    {
+                        var categoryTotal = transactions
+                            .Where(t => t.CategoryId == category.Id && t.Type == TransactionType.Income)
+                            .Sum(t => t.Amount);
+
+                        if (categoryTotal > 0)
+                        {
+                            incomeBreakdown.Add(new CategoryBreakdownItem
+                            {
+                                CategoryName = category.Name,
+                                CategoryIcon = category.Icon,
+                                CategoryColor = string.IsNullOrEmpty(category.Color) ? "#4CAF50" : category.Color,
+                                Amount = categoryTotal,
+                                Percentage = (double)((categoryTotal / totalIncome) * 100)
+                            });
+                        }
+                    }
+
+                    incomeBreakdown = incomeBreakdown.OrderByDescending(c => c.Amount).ToList();
+                }
+
+                newReport.IncomeBreakdown = new ObservableCollection<CategoryBreakdownItem>(incomeBreakdown);
+                Debug.WriteLine($"Категорий доходов: {incomeBreakdown.Count}");
+
+                // Детализация расходов по категориям
+                var expenseBreakdown = new List<CategoryBreakdownItem>();
                 var totalExpenses = newReport.TotalExpenses;
 
                 if (totalExpenses > 0)
@@ -134,26 +220,26 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
 
                         if (categoryTotal > 0)
                         {
-                            categoryBreakdown.Add(new CategoryBreakdownItem
+                            expenseBreakdown.Add(new CategoryBreakdownItem
                             {
                                 CategoryName = category.Name,
                                 CategoryIcon = category.Icon,
-                                CategoryColor = string.IsNullOrEmpty(category.Color) ? "#6200EA" : category.Color,
+                                CategoryColor = string.IsNullOrEmpty(category.Color) ? "#F44336" : category.Color,
                                 Amount = categoryTotal,
                                 Percentage = (double)((categoryTotal / totalExpenses) * 100)
                             });
                         }
                     }
 
-                    categoryBreakdown = categoryBreakdown.OrderByDescending(c => c.Amount).ToList();
+                    expenseBreakdown = expenseBreakdown.OrderByDescending(c => c.Amount).ToList();
                 }
 
-                newReport.CategoryBreakdown = new ObservableCollection<CategoryBreakdownItem>(categoryBreakdown);
-                Debug.WriteLine($"Категорий расходов: {categoryBreakdown.Count}");
+                newReport.ExpenseBreakdown = new ObservableCollection<CategoryBreakdownItem>(expenseBreakdown);
+                Debug.WriteLine($"Категорий расходов: {expenseBreakdown.Count}");
 
-                HasData = newReport.CategoryBreakdown.Count > 0;
+                HasData = expenseBreakdown.Count > 0 || incomeBreakdown.Count > 0;
 
-                // Monthly trends - теперь загружаем всегда, даже если нет расходов
+                // Monthly trends
                 var monthlyTrends = new List<MonthlyTrendItem>();
                 var currentDate = ReportStartDate;
 
@@ -181,10 +267,42 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
 
                 newReport.MonthlyTrends = new ObservableCollection<MonthlyTrendItem>(monthlyTrends);
 
+                // Загружаем все транзакции за период с деталями
+                var transactionItems = new ObservableCollection<TransactionDisplayItem>();
+
+                foreach (var transaction in transactions.OrderByDescending(t => t.Date))
+                {
+                    var category = categories.FirstOrDefault(c => c.Id == transaction.CategoryId)
+                                ?? new Category { Name = "Без категории", Icon = "❓", Color = "#9E9E9E" };
+
+                    var account = accounts.FirstOrDefault(a => a.Id == transaction.AccountId)
+                               ?? new Account { Name = "Неизвестный счет" };
+
+                    transactionItems.Add(new TransactionDisplayItem
+                    {
+                        Transaction = transaction,
+                        Category = category,
+                        Account = account
+                    });
+                }
+
+                newReport.Transactions = transactionItems;
+                Debug.WriteLine($"Загружено транзакций для отображения: {transactionItems.Count}");
+
                 // Присваиваем новый отчет
                 CurrentReport = newReport;
+
+                // Фильтруем транзакции
+                FilterTransactions();
+
+                // Определяем режим отображения чисел
+                DetermineAmountDisplayMode();
+
                 OnPropertyChanged(nameof(HasData));
                 OnPropertyChanged(nameof(HasMonthlyData));
+                OnPropertyChanged(nameof(HasTransactions));
+                OnPropertyChanged(nameof(HasIncomeData));
+                OnPropertyChanged(nameof(HasExpenseData));
                 Debug.WriteLine("Отчет успешно сгенерирован");
             }
             catch (Exception ex)
@@ -198,26 +316,69 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
             }
         }
 
+        // Фильтрация транзакций по поисковому запросу
+        private void FilterTransactions()
+        {
+            if (CurrentReport?.Transactions == null)
+            {
+                FilteredTransactions.Clear();
+                return;
+            }
+
+            var query = SearchQuery?.ToLower() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                FilteredTransactions = new ObservableCollection<TransactionDisplayItem>(CurrentReport.Transactions);
+            }
+            else
+            {
+                var filtered = CurrentReport.Transactions
+                    .Where(t =>
+                        t.Description?.ToLower().Contains(query) == true ||
+                        t.CategoryName?.ToLower().Contains(query) == true ||
+                        t.AccountName?.ToLower().Contains(query) == true ||
+                        t.Amount.ToString().Contains(query))
+                    .ToList();
+
+                FilteredTransactions = new ObservableCollection<TransactionDisplayItem>(filtered);
+            }
+
+            OnPropertyChanged(nameof(FilteredTransactions));
+        }
+
+        partial void OnSearchQueryChanged(string value)
+        {
+            FilterTransactions();
+        }
+
         public void DrawChart(SKCanvas canvas, int width, int height)
         {
             canvas.Clear(SKColors.White);
 
-            if (ChartType == "Линейный график")
-            {
-                DrawLineChart(canvas, width, height);
-                return;
-            }
+            // Определяем, какие данные показывать в зависимости от выбранного типа диаграммы
+            var hasIncome = CurrentReport?.IncomeBreakdown?.Count > 0;
+            var hasExpense = CurrentReport?.ExpenseBreakdown?.Count > 0;
 
-            if (CurrentReport?.CategoryBreakdown == null || CurrentReport.CategoryBreakdown.Count == 0)
+            if (!hasIncome && !hasExpense)
             {
                 DrawNoDataMessage(canvas, width, height);
                 return;
             }
 
             if (ChartType == "Круговая")
-                DrawPieChart(canvas, width, height);
+            {
+                // Для круговой диаграммы показываем только расходы (как более показательные)
+                if (hasExpense)
+                    DrawPieChart(canvas, width, height, CurrentReport.ExpenseBreakdown);
+                else if (hasIncome)
+                    DrawPieChart(canvas, width, height, CurrentReport.IncomeBreakdown);
+            }
             else if (ChartType == "Столбчатая")
-                DrawBarChart(canvas, width, height);
+            {
+                // Для столбчатой показываем сравнение доходов и расходов по категориям
+                DrawComparisonBarChart(canvas, width, height);
+            }
         }
 
         private void DrawNoDataMessage(SKCanvas canvas, int width, int height)
@@ -232,27 +393,27 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
             canvas.DrawText("Нет данных для отображения", width / 2, height / 2, paint);
         }
 
-        private void DrawPieChart(SKCanvas canvas, int width, int height)
+        private void DrawPieChart(SKCanvas canvas, int width, int height, ObservableCollection<CategoryBreakdownItem> items)
         {
             var centerX = width / 2f;
             var centerY = height / 2f;
-            var radius = Math.Min(width, height) / 2.5f; // Увеличил радиус
+            var radius = Math.Min(width, height) / 2.5f;
 
             float startAngle = -90;
 
             // Нормализация процентов
-            var totalPercentage = CurrentReport.CategoryBreakdown.Sum(c => c.Percentage);
+            var totalPercentage = items.Sum(c => c.Percentage);
             if (Math.Abs(totalPercentage - 100) > 0.01)
             {
                 var factor = 100 / totalPercentage;
-                foreach (var item in CurrentReport.CategoryBreakdown)
+                foreach (var item in items)
                 {
                     item.Percentage *= factor;
                 }
             }
 
             // Рисуем сегменты
-            foreach (var item in CurrentReport.CategoryBreakdown)
+            foreach (var item in items)
             {
                 var sweepAngle = (float)(item.Percentage * 3.6); // 360/100 = 3.6
                 var color = SKColor.Parse(item.CategoryColor);
@@ -271,22 +432,52 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
             }
 
             // Рисуем легенду
-            DrawLegend(canvas, width, height);
+            DrawLegend(canvas, width, height, items);
         }
 
-        private void DrawBarChart(SKCanvas canvas, int width, int height)
+        private void DrawComparisonBarChart(SKCanvas canvas, int width, int height)
         {
-            var margin = 50f;
+            var margin = 60f;
             var chartWidth = width - 2 * margin;
             var chartHeight = height - 2 * margin;
             var bottomY = height - margin;
 
-            var items = CurrentReport.CategoryBreakdown.Take(8).ToList(); // Показываем до 8 категорий
-            var barWidth = (chartWidth - (items.Count - 1) * 15) / items.Count; // Автоматический расчет ширины
-            barWidth = Math.Min(barWidth, 60f); // Максимальная ширина 60px
+            // Объединяем все категории (доходы и расходы) для отображения
+            var allItems = new List<CategoryBreakdownItem>();
 
-            var maxAmount = (float)CurrentReport.CategoryBreakdown.Max(c => (float)c.Amount);
-            var scale = (float)(chartHeight - 30) / maxAmount;
+            if (CurrentReport.IncomeBreakdown != null)
+                allItems.AddRange(CurrentReport.IncomeBreakdown.Select(i =>
+                    new CategoryBreakdownItem
+                    {
+                        CategoryName = i.CategoryName + " (Д)",
+                        CategoryIcon = i.CategoryIcon,
+                        CategoryColor = i.CategoryColor,
+                        Amount = i.Amount,
+                        Percentage = i.Percentage,
+                        IsIncome = true
+                    }));
+
+            if (CurrentReport.ExpenseBreakdown != null)
+                allItems.AddRange(CurrentReport.ExpenseBreakdown.Select(e =>
+                    new CategoryBreakdownItem
+                    {
+                        CategoryName = e.CategoryName + " (Р)",
+                        CategoryIcon = e.CategoryIcon,
+                        CategoryColor = e.CategoryColor,
+                        Amount = e.Amount,
+                        Percentage = e.Percentage,
+                        IsIncome = false
+                    }));
+
+            var items = allItems.OrderByDescending(i => i.Amount).Take(8).ToList();
+
+            if (items.Count == 0) return;
+
+            var barWidth = (chartWidth - (items.Count - 1) * 15) / items.Count;
+            barWidth = Math.Min(barWidth, 70f);
+
+            var maxAmount = (float)items.Max(i => (float)i.Amount);
+            var scale = (float)(chartHeight - 50) / maxAmount;
 
             var x = margin;
 
@@ -299,10 +490,34 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
                 IsAntialias = true
             })
             {
-                // Вертикальная ось
                 canvas.DrawLine(margin - 5, margin, margin - 5, bottomY, axisPaint);
-                // Горизонтальная ось
                 canvas.DrawLine(margin - 5, bottomY, width - margin + 5, bottomY, axisPaint);
+            }
+
+            // Рисуем сетку по горизонтали
+            using (var gridPaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                Color = SKColors.LightGray.WithAlpha(0x80),
+                StrokeWidth = 1,
+                PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0)
+            })
+            {
+                for (int i = 0; i <= 5; i++)
+                {
+                    var y = bottomY - (i * chartHeight / 5);
+                    canvas.DrawLine(margin - 5, y, width - margin + 5, y, gridPaint);
+
+                    using var textPaint = new SKPaint
+                    {
+                        Color = SKColors.Gray,
+                        TextSize = 10,
+                        IsAntialias = true,
+                        TextAlign = SKTextAlign.Right
+                    };
+                    var value = maxAmount / 5 * i;
+                    canvas.DrawText(FormatShortAmount((decimal)value), margin - 15, y + 3, textPaint);
+                }
             }
 
             // Рисуем столбцы
@@ -318,10 +533,8 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
                     IsAntialias = true
                 };
 
-                // Столбец
                 canvas.DrawRect(x, bottomY - barHeight, barWidth, barHeight, fillPaint);
 
-                // Обводка
                 using var strokePaint = new SKPaint
                 {
                     Style = SKPaintStyle.Stroke,
@@ -335,281 +548,66 @@ public bool HasMonthlyData => CurrentReport?.MonthlyTrends?.Count > 0;
                 using var valuePaint = new SKPaint
                 {
                     Color = SKColors.Black,
-                    TextSize = 12,
+                    TextSize = 11,
                     IsAntialias = true,
                     TextAlign = SKTextAlign.Center
                 };
-                canvas.DrawText($"{item.Amount:C0}", x + barWidth / 2, bottomY - barHeight - 5, valuePaint);
+                canvas.DrawText(FormatShortAmount(item.Amount), x + barWidth / 2, bottomY - barHeight - 5, valuePaint);
 
                 // Название категории
                 using var textPaint = new SKPaint
                 {
                     Color = SKColors.Black,
-                    TextSize = 11,
+                    TextSize = 10,
                     IsAntialias = true,
                     TextAlign = SKTextAlign.Center
                 };
 
-                var categoryName = item.CategoryName.Length > 8
-                    ? item.CategoryName.Substring(0, 8) + "..."
+                var categoryName = item.CategoryName.Length > 10
+                    ? item.CategoryName.Substring(0, 10) + ".."
                     : item.CategoryName;
 
-                canvas.DrawText(categoryName, x + barWidth / 2, bottomY + 15, textPaint);
+                canvas.DrawText(categoryName, x + barWidth / 2, bottomY + 20, textPaint);
+
+                // Иконка типа (⬆ для дохода, ⬇ для расхода)
+                using var iconPaint = new SKPaint
+                {
+                    Color = item.IsIncome ? SKColors.Green : SKColors.Red,
+                    TextSize = 12,
+                    IsAntialias = true,
+                    TextAlign = SKTextAlign.Center
+                };
+                canvas.DrawText(item.IsIncome ? "⬆" : "⬇", x + barWidth / 2, bottomY + 35, iconPaint);
 
                 x += barWidth + 15;
             }
         }
 
-        private void DrawLineChart(SKCanvas canvas, int width, int height)
+        private string FormatShortAmount(decimal amount)
         {
-            if (CurrentReport?.MonthlyTrends == null || CurrentReport.MonthlyTrends.Count < 2)
-            {
-                DrawNoDataMessage(canvas, width, height);
-                return;
-            }
-
-            var margin = 80f;
-            var chartWidth = width - 2 * margin;
-            var chartHeight = height - 2 * margin;
-            var bottomY = height - margin;
-            var leftX = margin;
-
-            var trends = CurrentReport.MonthlyTrends.ToList();
-
-            // 🔥 ФИКС: Нормализуем данные для отображения
-            var normalizedTrends = NormalizeTrends(trends);
-
-            // Находим максимальное значение после нормализации (макс будет 100%)
-            var maxValue = 100f; // После нормализации максимум 100%
-
-            var scale = chartHeight / maxValue;
-            var stepX = trends.Count > 1 ? chartWidth / (trends.Count - 1) : chartWidth;
-
-            // Рисуем сетку
-            DrawChartGrid(canvas, leftX, bottomY, chartWidth, chartHeight, maxValue, margin, width);
-
-            // Рисуем оси
-            using (var axisPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = SKColors.Black,
-                StrokeWidth = 2,
-                IsAntialias = true
-            })
-            {
-                canvas.DrawLine(leftX, margin - 10, leftX, bottomY + 10, axisPaint);
-                canvas.DrawLine(leftX - 10, bottomY, width - margin + 10, bottomY, axisPaint);
-            }
-
-            // Собираем точки для доходов и расходов (используем нормализованные значения)
-            var incomePoints = new List<SKPoint>();
-            var expensePoints = new List<SKPoint>();
-
-            for (int i = 0; i < trends.Count; i++)
-            {
-                var x = leftX + i * stepX;
-
-                incomePoints.Add(new SKPoint(x, bottomY - normalizedTrends[i].NormalizedIncome * scale));
-                expensePoints.Add(new SKPoint(x, bottomY - normalizedTrends[i].NormalizedExpenses * scale));
-            }
-
-            // Рисуем линии и точки
-            DrawLineSeriesWithPoints(canvas, incomePoints, SKColors.Green, "Доходы");
-            DrawLineSeriesWithPoints(canvas, expensePoints, SKColors.Red, "Расходы");
-
-            // Подписи
-            using (var textPaint = new SKPaint
-            {
-                Color = SKColors.Black,
-                TextSize = 11,
-                IsAntialias = true,
-                TextAlign = SKTextAlign.Center
-            })
-            {
-                for (int i = 0; i < trends.Count; i++)
-                {
-                    var x = leftX + i * stepX;
-
-                    // Название месяца
-                    canvas.DrawText(trends[i].MonthName, x, bottomY + 25, textPaint);
-
-                    // 🔥 ФИКС: Показываем реальные значения в более читаемом формате
-                    using (var valuePaint = new SKPaint
-                    {
-                        Color = SKColors.DarkGray,
-                        TextSize = 9,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center
-                    })
-                    {
-                        // Форматируем огромные числа
-                        var incomeStr = FormatLargeNumber(trends[i].Income);
-                        var expenseStr = FormatLargeNumber(trends[i].Expenses);
-
-                        if (trends[i].Income > 0)
-                        {
-                            canvas.DrawText($"Д:{incomeStr}", x, incomePoints[i].Y - 15, valuePaint);
-                        }
-
-                        if (trends[i].Expenses > 0)
-                        {
-                            canvas.DrawText($"Р:{expenseStr}", x, expensePoints[i].Y + 20, valuePaint);
-                        }
-                    }
-                }
-            }
-
-            // Легенда с пояснением
-            using (var infoPaint = new SKPaint
-            {
-                Color = SKColors.Gray,
-                TextSize = 10,
-                IsAntialias = true,
-                TextAlign = SKTextAlign.Left
-            })
-            {
-                canvas.DrawText("* График показывает относительные изменения (в % от максимума)",
-                    margin, margin - 30, infoPaint);
-            }
-
-            DrawChartLegend(canvas, width, margin);
+            if (amount >= 1_000_000_000)
+                return $"{amount / 1_000_000_000m:F1} млрд";
+            if (amount >= 1_000_000)
+                return $"{amount / 1_000_000m:F1} млн";
+            if (amount >= 1_000)
+                return $"{amount / 1_000m:F1} тыс";
+            return $"{amount:F0}";
         }
 
-
-        /// <summary>
-/// Нормализует значения для отображения в процентах от максимума
-/// </summary>
-private List<NormalizedTrend> NormalizeTrends(List<MonthlyTrendItem> trends)
+        private void DrawLegend(SKCanvas canvas, int width, int height, ObservableCollection<CategoryBreakdownItem> items)
         {
-            var maxIncome = trends.Max(t => t.Income);
-            var maxExpenses = trends.Max(t => t.Expenses);
-            var globalMax = Math.Max(maxIncome, maxExpenses);
-
-            if (globalMax == 0) globalMax = 1; // Защита от деления на ноль
-
-            return trends.Select(t => new NormalizedTrend
-            {
-                MonthName = t.MonthName,
-                Income = t.Income,
-                Expenses = t.Expenses,
-                NormalizedIncome = (float)(t.Income / globalMax * 100),
-                NormalizedExpenses = (float)(t.Expenses / globalMax * 100)
-            }).ToList();
-        }
-
-        /// <summary>
-        /// Форматирует огромные числа в читаемый вид
-        /// </summary>
-        private string FormatLargeNumber(decimal number)
-        {
-            if (number >= 1_000_000_000_000) // Триллионы
-                return $"{number / 1_000_000_000_000m:F1}трлн";
-            if (number >= 1_000_000_000) // Миллиарды
-                return $"{number / 1_000_000_000m:F1}млрд";
-            if (number >= 1_000_000) // Миллионы
-                return $"{number / 1_000_000m:F1}млн";
-            if (number >= 1_000) // Тысячи
-                return $"{number / 1_000m:F1}тыс";
-
-            return $"{number:F0}";
-        }
-
-        private void DrawChartGrid(SKCanvas canvas, float leftX, float bottomY,
-    float chartWidth, float chartHeight, float maxValue, float margin, float width)
-        {
-            using (var gridPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = SKColors.LightGray.WithAlpha(0x80),
-                StrokeWidth = 1,
-                IsAntialias = true,
-                PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0)
-            })
-            {
-                // Горизонтальные линии сетки (5 линий)
-                for (int i = 0; i <= 5; i++)
-                {
-                    var y = bottomY - (i * chartHeight / 5);
-                    canvas.DrawLine(leftX, y, width - margin, y, gridPaint);
-
-                    // 🔥 ИСПРАВЛЕНО: убрал форматирование валюты для процентов
-                    using var textPaint = new SKPaint
-                    {
-                        Color = SKColors.Gray,
-                        TextSize = 10,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Right
-                    };
-                    var percentage = (maxValue / 5) * i;
-                    canvas.DrawText($"{percentage:F0}%", leftX - 10, y + 3, textPaint);
-                }
-            }
-        }
-        private void DrawLineSeriesWithPoints(SKCanvas canvas, List<SKPoint> points, SKColor color, string label)
-        {
-            if (points.Count < 2) return;
-
-            // Рисуем линию
-            using (var linePaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = color,
-                StrokeWidth = 3,
-                IsAntialias = true
-            })
-            {
-                for (int i = 0; i < points.Count - 1; i++)
-                {
-                    canvas.DrawLine(points[i], points[i + 1], linePaint);
-                }
-            }
-
-            // Рисуем точки
-            using (var pointPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Fill,
-                Color = color,
-                IsAntialias = true
-            })
-            {
-                foreach (var point in points)
-                {
-                    // Пропускаем точки с отрицательными координатами (если значение 0)
-                    if (point.Y <= canvas.LocalClipBounds.Top + 10) continue;
-
-                    canvas.DrawCircle(point, 6, pointPaint);
-
-                    // Белая обводка для точек
-                    using var strokePaint = new SKPaint
-                    {
-                        Style = SKPaintStyle.Stroke,
-                        Color = SKColors.White,
-                        StrokeWidth = 2,
-                        IsAntialias = true
-                    };
-                    canvas.DrawCircle(point, 6, strokePaint);
-                }
-            }
-        }
-       
-
-      
-
-        private void DrawLegend(SKCanvas canvas, int width, int height)
-        {
-            var items = CurrentReport.CategoryBreakdown.Take(5).ToList();
             var legendX = 20f;
-            var legendY = height - 100f;
+            var legendY = height - 120f;
             var spacing = 25f;
 
             using var textPaint = new SKPaint
             {
                 Color = SKColors.Black,
-                TextSize = 12,
+                TextSize = 11,
                 IsAntialias = true
             };
 
-            for (int i = 0; i < items.Count; i++)
+            for (int i = 0; i < Math.Min(items.Count, 6); i++)
             {
                 var item = items[i];
                 var color = SKColor.Parse(item.CategoryColor);
@@ -621,37 +619,14 @@ private List<NormalizedTrend> NormalizeTrends(List<MonthlyTrendItem> trends)
                 };
 
                 canvas.DrawRect(legendX, legendY + i * spacing, 15, 15, rectPaint);
-                canvas.DrawText($"{item.CategoryName} ({item.Percentage:F1}%)",
+
+                var shortName = item.CategoryName.Length > 15
+                    ? item.CategoryName.Substring(0, 15) + ".."
+                    : item.CategoryName;
+
+                canvas.DrawText($"{shortName} ({item.Percentage:F1}%)",
                     legendX + 20, legendY + i * spacing + 12, textPaint);
             }
-        }
-
-        private static void DrawChartLegend(SKCanvas canvas, int width, float margin)
-        {
-            var legendX = width - 150;
-            var legendY = margin + 20;
-            var spacing = 25f;
-
-            using var textPaint = new SKPaint
-            {
-                Color = SKColors.Black,
-                TextSize = 12,
-                IsAntialias = true
-            };
-
-            // Доходы
-            using (var incomePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Green })
-            {
-                canvas.DrawRect(legendX, legendY, 15, 15, incomePaint);
-            }
-            canvas.DrawText("Доходы", legendX + 20, legendY + 12, textPaint);
-
-            // Расходы
-            using (var expensePaint = new SKPaint { Style = SKPaintStyle.Fill, Color = SKColors.Red })
-            {
-                canvas.DrawRect(legendX, legendY + spacing, 15, 15, expensePaint);
-            }
-            canvas.DrawText("Расходы", legendX + 20, legendY + spacing + 12, textPaint);
         }
 
         partial void OnReportStartDateChanged(DateTime value)
@@ -667,10 +642,8 @@ private List<NormalizedTrend> NormalizeTrends(List<MonthlyTrendItem> trends)
                 ReportStartDate = value;
             _ = GenerateReport();
         }
-
     }
 
-    // Остальные классы остаются без изменений
     public partial class ReportData : ObservableObject
     {
         [ObservableProperty]
@@ -683,10 +656,16 @@ private List<NormalizedTrend> NormalizeTrends(List<MonthlyTrendItem> trends)
         private decimal _netSavings;
 
         [ObservableProperty]
-        private ObservableCollection<CategoryBreakdownItem> _categoryBreakdown = new();
+        private ObservableCollection<CategoryBreakdownItem> _incomeBreakdown = new();
+
+        [ObservableProperty]
+        private ObservableCollection<CategoryBreakdownItem> _expenseBreakdown = new();
 
         [ObservableProperty]
         private ObservableCollection<MonthlyTrendItem> _monthlyTrends = new();
+
+        [ObservableProperty]
+        private ObservableCollection<TransactionDisplayItem> _transactions = new();
     }
 
     public partial class CategoryBreakdownItem : ObservableObject
@@ -705,15 +684,11 @@ private List<NormalizedTrend> NormalizeTrends(List<MonthlyTrendItem> trends)
 
         [ObservableProperty]
         private double _percentage;
+
+        [ObservableProperty]
+        private bool _isIncome;
     }
-    public class NormalizedTrend
-    {
-        public string MonthName { get; set; }
-        public decimal Income { get; set; }
-        public decimal Expenses { get; set; }
-        public float NormalizedIncome { get; set; }
-        public float NormalizedExpenses { get; set; }
-    }
+
     public partial class MonthlyTrendItem : ObservableObject
     {
         [ObservableProperty]

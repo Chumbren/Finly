@@ -23,12 +23,22 @@
             <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
             <converters:CountToBoolConverter x:Key="CountToBoolConverter"/>
             <converters:InvertedCountToBoolConverter x:Key="InvertedCountToBoolConverter"/>
-            <converters:NumericConverter x:Key="InveNumericConverterrtedCountToBoolConverter"/>
+            <converters:NumericConverter x:Key="NumericConverter"/>
             <converters:BoolToStatusTextConverter x:Key="BoolToStatusTextConverter"/>
             <converters:SavingsColorConverter x:Key="SavingsColorConverter"/>
             <converters:AccountTypeToStringConverter x:Key="AccountTypeToStringConverter"/>
             <converters:AmountValidationConverter x:Key="AmountValidationConverter"/>
             <converters:DateValidationConverter x:Key="DateValidationConverter"/>
+            <converters:NetBalanceConverter x:Key="NetBalanceConverter"/>
+            <converters:NullToColorConverter x:Key="NullToColorConverter"/>
+            <converters:BoolToColorConverter  x:Key="BoolToColorConverter "/>
+            <converters:BoolToBorderColorConverter x:Key="BoolToBorderColorConverter"/>
+            <converters:BoolToLightColorConverter x:Key="BoolToLightColorConverter"/>
+            <converters:BoolToStatusColorConverter x:Key="BoolToStatusColorConverter"/>
+            <converters:BoolToStatusLightColorConverter x:Key="BoolToStatusLightColorConverter"/>
+            <converters:TitleToIconConverter x:Key="TitleToIconConverter"/>
+            <converters:InvertedBoolToColumnConverter x:Key="InvertedBoolToColumnConverter"/>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

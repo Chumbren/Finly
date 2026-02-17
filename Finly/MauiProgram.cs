@@ -3,6 +3,7 @@ using Finly.Converters;
 using Finly.Services;
 using Finly.ViewModels;
 using Finly.Views;
+using Finly.Views.ModelWindows;
 using Microsoft.Extensions.Logging;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 
@@ -49,6 +50,7 @@ namespace Finly
             builder.Services.AddTransient<AccountsPage>();
             builder.Services.AddTransient<AddAccountPage>();
             builder.Services.AddTransient<ExportOptionsPage>();
+            builder.Services.AddTransient<AccountsPopup>();
             builder.Services.AddTransient<ReportsPage>();
 
             // Конвертеры

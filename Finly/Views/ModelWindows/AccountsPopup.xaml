@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Finly.Models"
+             xmlns:viewmodels="clr-namespace:Finly.ViewModels"
+             xmlns:converters="clr-namespace:Finly.Converters"
+             x:Class="Finly.Views.ModelWindows.AccountsPopup"
+             x:DataType="viewmodels:MainViewModel"
+             HeightRequest="550"
+             WidthRequest="380">
+
+
+
+    <Border StrokeThickness="1"
+            Stroke="#E0E0E0"
+            BackgroundColor="White"
+            StrokeShape="RoundRectangle 20"
+            HorizontalOptions="Center"
+            VerticalOptions="Center"
+            Padding="0">
+
+        <VerticalStackLayout Spacing="0">
+            <!-- Заголовок - Исправлено: CornerRadius у Frame, а не у Grid -->
+            <Frame Padding="20" 
+                   BackgroundColor="#4A148C" 
+                   CornerRadius="20"
+                   HasShadow="False">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Grid.Column="0" 
+                           Text="Выберите счет" 
+                           TextColor="White" 
+                           FontSize="20" 
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+                    <Label Grid.Column="1"
+                           Text="✕"
+                           TextColor="White"
+                           FontSize="22"
+                           FontAttributes="Bold">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ClosePopupCommand}"/>
+                        </Label.GestureRecognizers>
+                    </Label>
+                </Grid>
+            </Frame>
+
+            <!-- Список счетов -->
+            <ScrollView HeightRequest="350" Padding="15">
+                <VerticalStackLayout Spacing="8">
+
+                    <!-- Все счета -->
+                    <Frame BackgroundColor="{Binding CurrentAccount, Converter={StaticResource NullToColorConverter}}"
+                           Padding="15"
+                           CornerRadius="12"
+                           HasShadow="False"
+                           BorderColor="#E0E0E0">
+                        <Frame.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ShowAllAccountsCommand}"/>
+                        </Frame.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                            <Label Grid.Column="0" Text="📊" FontSize="22" Margin="0,0,5,0"/>
+                            <Label Grid.Column="1" Text="Все счета" 
+                                   FontSize="16" 
+                                   FontAttributes="Bold" 
+                                   TextColor="#2D3436"
+                                   VerticalOptions="Center"/>
+                            <Label Grid.Column="2" 
+                                   Text="{Binding TotalBalance, StringFormat='{0:N0} ₽'}" 
+                                   FontSize="14" 
+                                   TextColor="#4A148C"
+                                   FontAttributes="Bold"
+                                   VerticalOptions="Center"/>
+                        </Grid>
+                    </Frame>
+
+                    <!-- Разделитель -->
+                    <BoxView HeightRequest="1" Color="#E0E0E0" Margin="5,5"/>
+
+                    <!-- Счета из коллекции -->
+                    <CollectionView ItemsSource="{Binding Accounts}" 
+                                    BackgroundColor="Transparent"
+                                    HeightRequest="250">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:Account">
+                                <Frame BackgroundColor="White"
+                                       Padding="15"
+                                       CornerRadius="12"
+                                       Margin="0,4"
+                                       HasShadow="False"
+                                       BorderColor="{Binding IsActive, Converter={StaticResource BoolToBorderColorConverter}}">
+                                    <Frame.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MainViewModel}}, Path=SelectAccountCommand}"
+                                                              CommandParameter="{Binding .}"/>
+                                    </Frame.GestureRecognizers>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                        <!-- Иконка счета -->
+                                        <Frame Grid.Column="0"
+                                               WidthRequest="40"
+                                               HeightRequest="40"
+                                               CornerRadius="20"
+                                               BackgroundColor="{Binding IsActive, Converter={StaticResource BoolToLightColorConverter}}"
+                                               Padding="0"
+                                               IsClippedToBounds="True"
+                                               HasShadow="False">
+                                            <Label Text="{Binding Type, Converter={StaticResource AccountTypeToIconConverter}}" 
+                                                   FontSize="20"
+                                                   HorizontalOptions="Center" 
+                                                   VerticalOptions="Center"/>
+                                        </Frame>
+
+                                        <!-- Информация о счете - Исправлено: убраны CornerRadius у Label -->
+                                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                            <HorizontalStackLayout Spacing="5">
+                                                <Label Text="{Binding Name}" 
+                                                       FontSize="16" 
+                                                       FontAttributes="Bold"
+                                                       TextColor="#2D3436"
+                                                       LineBreakMode="TailTruncation"/>
+                                                <Label Text="⭐" 
+                                                       FontSize="14" 
+                                                       TextColor="#FFD700"
+                                                       IsVisible="{Binding IsPrimary}"/>
+                                            </HorizontalStackLayout>
+
+                                            <HorizontalStackLayout Spacing="5">
+                                                <Frame BackgroundColor="#F0F0F0"
+                                                       Padding="4,2"
+                                                       CornerRadius="4"
+                                                       HasShadow="False">
+                                                    <Label Text="{Binding Currency}" 
+                                                           FontSize="12" 
+                                                           TextColor="#666"/>
+                                                </Frame>
+                                                <Frame BackgroundColor="#F0F0F0"
+                                                       Padding="4,2"
+                                                       CornerRadius="4"
+                                                       HasShadow="False">
+                                                    <Label Text="{Binding Type, Converter={StaticResource AccountTypeToStringConverter}}" 
+                                                           FontSize="12" 
+                                                           TextColor="#666"/>
+                                                </Frame>
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+
+                                        <!-- Баланс и статус -->
+                                        <VerticalStackLayout Grid.Column="2" 
+                                                            HorizontalOptions="End"
+                                                            Spacing="2">
+                                            <Label Text="{Binding Balance, StringFormat='{0:N0} ₽'}" 
+                                                   FontSize="16" 
+                                                   FontAttributes="Bold"
+                                                   TextColor="{Binding Balance, Converter={StaticResource AmountColorConverter}}"
+                                                   HorizontalTextAlignment="End"/>
+                                            <Frame BackgroundColor="{Binding IsActive, Converter={StaticResource BoolToStatusLightColorConverter}}"
+                                                   Padding="6,2"
+                                                   CornerRadius="6"
+                                                   HasShadow="False">
+                                                <Label Text="{Binding IsActive, Converter={StaticResource BoolToStatusTextConverter}}"
+                                                       FontSize="11"
+                                                       TextColor="{Binding IsActive, Converter={StaticResource BoolToStatusColorConverter}}"
+                                                       HorizontalTextAlignment="Center"/>
+                                            </Frame>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- Кнопка закрытия - Исправлено: Button поддерживает CornerRadius -->
+            <Button Text="Закрыть"
+                    BackgroundColor="#F5F5F5"
+                    TextColor="#666"
+                    HeightRequest="50"
+                    CornerRadius="20"
+                    FontSize="16"
+                    Command="{Binding ClosePopupCommand}"/>
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

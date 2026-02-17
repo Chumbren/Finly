@@ -1,8 +1,10 @@
-﻿using Finly.ViewModels;
-using SkiaSharp;
-using System.Diagnostics;
-using CommunityToolkit.Maui;
+﻿using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Storage;
+using Finly.Models;
+using Finly.ViewModels;
+using SkiaSharp;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace Finly.Services
 {
@@ -33,16 +35,39 @@ namespace Finly.Services
 
                     if (reportType == "Текущий отчет" || reportType == "Полный отчет за период")
                     {
-                        DrawChartsPage(pdf, report);
-                        DrawCategoriesPage(pdf, report);
+                        if (report.IncomeBreakdown?.Count > 0 || report.ExpenseBreakdown?.Count > 0)
+                        {
+                            DrawChartsPage(pdf, report);
+                        }
+
+                        if (report.ExpenseBreakdown?.Count > 0)
+                            DrawExpenseCategoriesPage(pdf, report);
+
+                        if (report.IncomeBreakdown?.Count > 0)
+                            DrawIncomeCategoriesPage(pdf, report);
+
+                        // ВСЕГДА добавляем страницу с транзакциями для полного отчета
+                        if (report.Transactions?.Count > 0)
+                            DrawTransactionsPage(pdf, report);
                     }
                     else if (reportType == "Только график")
                     {
-                        DrawChartsPage(pdf, report);
+                        if (report.IncomeBreakdown?.Count > 0 || report.ExpenseBreakdown?.Count > 0)
+                        {
+                            DrawChartsPage(pdf, report);
+                        }
                     }
                     else if (reportType == "Детализация по категориям")
                     {
-                        DrawCategoriesPage(pdf, report);
+                        if (report.ExpenseBreakdown?.Count > 0)
+                            DrawExpenseCategoriesPage(pdf, report);
+                        if (report.IncomeBreakdown?.Count > 0)
+                            DrawIncomeCategoriesPage(pdf, report);
+                    }
+                    else if (reportType == "Все операции")
+                    {
+                        if (report.Transactions?.Count > 0)
+                            DrawTransactionsPage(pdf, report);
                     }
 
                     if (report.MonthlyTrends?.Count > 0 &&
@@ -57,7 +82,7 @@ namespace Finly.Services
                 // Сбрасываем позицию потока
                 memoryStream.Position = 0;
 
-                // Сохраняем через FileSaver - открывает системный диалог сохранения
+                // Сохраняем через FileSaver
                 var result = await _fileSaver.SaveAsync(fileName, memoryStream, new CancellationToken());
 
                 if (result.IsSuccessful)
@@ -81,89 +106,6 @@ namespace Finly.Services
                 return false;
             }
         }
-
-        private async Task<bool> SaveUsingFilePicker(string fileName, ReportData report, DateTime startDate, DateTime endDate, string reportType)
-        {
-            try
-            {
-                // Для сохранения файла используем другой подход
-                var customFileType = new FilePickerFileType(
-                    new Dictionary<DevicePlatform, IEnumerable<string>>
-                    {
-                        { DevicePlatform.WinUI, new[] { ".pdf" } },
-                        { DevicePlatform.Android, new[] { "application/pdf" } },
-                        { DevicePlatform.iOS, new[] { "com.adobe.pdf" } },
-                        { DevicePlatform.MacCatalyst, new[] { "com.adobe.pdf" } },
-                    });
-
-                var options = new PickOptions
-                {
-                    PickerTitle = "Сохранить отчет в PDF",
-                    FileTypes = customFileType,
-                };
-
-                // На некоторых платформах FilePicker не поддерживает сохранение
-                // Поэтому используем временный файл
-                var tempPath = Path.Combine(FileSystem.CacheDirectory, fileName);
-
-                // Сохраняем во временный файл
-                var result = await SavePdfToStream(tempPath, report, startDate, endDate, reportType);
-
-                if (result)
-                {
-                    // На Android и iOS показываем где файл сохранен
-                    await Shell.Current.DisplayAlertAsync("Успех",
-                        $"Отчет сохранен во временную папку:\n{tempPath}\n\nВы можете найти его через файловый менеджер.", "OK");
-                }
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Ошибка при сохранении: {ex.Message}");
-                return false;
-            }
-        }
-
-        private async Task<bool> SavePdfToStream(string filePath, ReportData report, DateTime startDate, DateTime endDate, string reportType)
-        {
-            try
-            {
-                using var stream = File.OpenWrite(filePath);
-                using var pdf = SKDocument.CreatePdf(stream);
-
-                DrawCoverPage(pdf, report, startDate, endDate);
-
-                if (reportType == "Текущий отчет" || reportType == "Полный отчет за период")
-                {
-                    DrawChartsPage(pdf, report);
-                    DrawCategoriesPage(pdf, report);
-                }
-                else if (reportType == "Только график")
-                {
-                    DrawChartsPage(pdf, report);
-                }
-                else if (reportType == "Детализация по категориям")
-                {
-                    DrawCategoriesPage(pdf, report);
-                }
-
-                if (report.MonthlyTrends?.Count > 0 &&
-                    (reportType == "Текущий отчет" || reportType == "Полный отчет за период"))
-                {
-                    DrawTrendsPage(pdf, report);
-                }
-
-                pdf.Close();
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Ошибка при создании PDF: {ex.Message}");
-                throw;
-            }
-        }
-
 
         private void DrawCoverPage(SKDocument pdf, ReportData report, DateTime startDate, DateTime endDate)
         {
@@ -196,6 +138,18 @@ namespace Finly.Services
                     canvas.DrawText($"Период: {startDate:d} — {endDate:d}", PageWidth / 2, 160, periodPaint);
                 }
 
+                // Количество операций
+                using (var countPaint = new SKPaint
+                {
+                    Color = SKColors.Gray,
+                    TextSize = 16,
+                    IsAntialias = true,
+                    TextAlign = SKTextAlign.Center
+                })
+                {
+                    canvas.DrawText($"Всего операций: {report.Transactions?.Count ?? 0}", PageWidth / 2, 190, countPaint);
+                }
+
                 // Линия-разделитель
                 using (var linePaint = new SKPaint
                 {
@@ -204,11 +158,11 @@ namespace Finly.Services
                     Style = SKPaintStyle.Stroke
                 })
                 {
-                    canvas.DrawLine(Margin, 200, PageWidth - Margin, 200, linePaint);
+                    canvas.DrawLine(Margin, 230, PageWidth - Margin, 230, linePaint);
                 }
 
                 // Блок с итогами
-                DrawSummaryBox(canvas, report, 250);
+                DrawSummaryBox(canvas, report, 280);
 
                 // Дата генерации
                 using (var datePaint = new SKPaint
@@ -311,15 +265,23 @@ namespace Finly.Services
                 Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
             })
             {
-                canvas.DrawText(value.ToString("C0"), x, y + 35, valuePaint);
+                canvas.DrawText(FormatAmount(value), x, y + 35, valuePaint);
             }
+        }
+
+        private string FormatAmount(decimal amount)
+        {
+            if (amount >= 1_000_000_000)
+                return $"{amount / 1_000_000_000m:F2} млрд ₽";
+            if (amount >= 1_000_000)
+                return $"{amount / 1_000_000m:F2} млн ₽";
+            if (amount >= 1_000)
+                return $"{amount / 1_000m:F2} тыс ₽";
+            return amount.ToString("C0");
         }
 
         private void DrawChartsPage(SKDocument pdf, ReportData report)
         {
-            if (report.CategoryBreakdown?.Count == 0)
-                return;
-
             var canvas = pdf.BeginPage(PageWidth, PageHeight);
 
             try
@@ -333,14 +295,45 @@ namespace Finly.Services
                     Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
                 })
                 {
-                    canvas.DrawText("Анализ расходов по категориям", Margin, 70, titlePaint);
+                    canvas.DrawText("Анализ доходов и расходов", Margin, 70, titlePaint);
                 }
 
-                // Круговая диаграмма
-                DrawPieChartForPdf(canvas, report, 150);
+                float currentY = 120;
 
-                // Легенда
-                DrawLegendForPdf(canvas, report, 550);
+                // Если есть расходы, рисуем круговую диаграмму расходов
+                if (report.ExpenseBreakdown?.Count > 0)
+                {
+                    using (var subtitlePaint = new SKPaint
+                    {
+                        Color = SKColors.Red,
+                        TextSize = 18,
+                        IsAntialias = true,
+                        Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                    })
+                    {
+                        canvas.DrawText("Расходы по категориям", Margin, currentY, subtitlePaint);
+                    }
+
+                    DrawPieChartForPdf(canvas, report.ExpenseBreakdown, currentY + 20);
+                    currentY += 300;
+                }
+
+                // Если есть доходы, рисуем круговую диаграмму доходов
+                if (report.IncomeBreakdown?.Count > 0)
+                {
+                    using (var subtitlePaint = new SKPaint
+                    {
+                        Color = SKColors.Green,
+                        TextSize = 18,
+                        IsAntialias = true,
+                        Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                    })
+                    {
+                        canvas.DrawText("Доходы по категориям", Margin, currentY, subtitlePaint);
+                    }
+
+                    DrawPieChartForPdf(canvas, report.IncomeBreakdown, currentY + 20);
+                }
             }
             finally
             {
@@ -348,16 +341,27 @@ namespace Finly.Services
             }
         }
 
-        private void DrawPieChartForPdf(SKCanvas canvas, ReportData report, float topY)
+        private void DrawPieChartForPdf(SKCanvas canvas, ObservableCollection<CategoryBreakdownItem> items, float topY)
         {
             var centerX = PageWidth / 2f;
-            var centerY = topY + 150;
-            var radius = 180;
+            var centerY = topY + 120;
+            var radius = 150;
 
             float startAngle = -90;
 
+            // Нормализация процентов
+            var totalPercentage = items.Sum(c => c.Percentage);
+            if (Math.Abs(totalPercentage - 100) > 0.01)
+            {
+                var factor = 100 / totalPercentage;
+                foreach (var item in items)
+                {
+                    item.Percentage *= factor;
+                }
+            }
+
             // Рисуем сегменты
-            foreach (var item in report.CategoryBreakdown)
+            foreach (var item in items)
             {
                 var sweepAngle = (float)(item.Percentage * 3.6);
                 var color = SKColor.Parse(item.CategoryColor);
@@ -384,23 +388,25 @@ namespace Finly.Services
                 IsAntialias = true
             };
             canvas.DrawCircle(centerX, centerY, radius, strokePaint);
+
+            // Легенда
+            DrawLegendForPdf(canvas, items, centerX + radius + 50, centerY - 100);
         }
 
-        private void DrawLegendForPdf(SKCanvas canvas, ReportData report, float startY)
+        private void DrawLegendForPdf(SKCanvas canvas, ObservableCollection<CategoryBreakdownItem> items, float startX, float startY)
         {
-            var legendX = 200f;
-            var spacing = 35f;
+            var spacing = 25f;
 
             using var textPaint = new SKPaint
             {
                 Color = SKColors.Black,
-                TextSize = 14,
+                TextSize = 12,
                 IsAntialias = true
             };
 
-            for (int i = 0; i < report.CategoryBreakdown.Count; i++)
+            for (int i = 0; i < Math.Min(items.Count, 8); i++)
             {
-                var item = report.CategoryBreakdown[i];
+                var item = items[i];
                 var y = startY + i * spacing;
 
                 // Цветной квадрат
@@ -409,17 +415,21 @@ namespace Finly.Services
                     Style = SKPaintStyle.Fill,
                     Color = SKColor.Parse(item.CategoryColor)
                 };
-                canvas.DrawRect(legendX, y, 25, 25, rectPaint);
+                canvas.DrawRect(startX, y, 15, 15, rectPaint);
 
                 // Текст
-                canvas.DrawText($"{item.CategoryName}: {item.Amount:C0} ({item.Percentage:F1}%)",
-                    legendX + 35, y + 18, textPaint);
+                var shortName = item.CategoryName.Length > 20
+                    ? item.CategoryName.Substring(0, 20) + ".."
+                    : item.CategoryName;
+
+                canvas.DrawText($"{shortName} ({item.Percentage:F1}%)",
+                    startX + 20, y + 12, textPaint);
             }
         }
 
-        private void DrawCategoriesPage(SKDocument pdf, ReportData report)
+        private void DrawIncomeCategoriesPage(SKDocument pdf, ReportData report)
         {
-            if (report.CategoryBreakdown?.Count == 0)
+            if (report.IncomeBreakdown?.Count == 0)
                 return;
 
             var canvas = pdf.BeginPage(PageWidth, PageHeight);
@@ -429,17 +439,17 @@ namespace Finly.Services
                 // Заголовок страницы
                 using (var titlePaint = new SKPaint
                 {
-                    Color = SKColors.Black,
+                    Color = SKColors.Green,
                     TextSize = 24,
                     IsAntialias = true,
                     Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
                 })
                 {
-                    canvas.DrawText("Детализация по категориям", Margin, 70, titlePaint);
+                    canvas.DrawText("Детализация доходов", Margin, 70, titlePaint);
                 }
 
                 // Таблица с категориями
-                DrawCategoriesTable(canvas, report, 120);
+                DrawCategoriesTable(canvas, report.IncomeBreakdown, 120, true);
             }
             finally
             {
@@ -447,9 +457,39 @@ namespace Finly.Services
             }
         }
 
-        private void DrawCategoriesTable(SKCanvas canvas, ReportData report, float topY)
+        private void DrawExpenseCategoriesPage(SKDocument pdf, ReportData report)
         {
-            var colWidths = new float[] { 80, 250, 150, 150 };
+            if (report.ExpenseBreakdown?.Count == 0)
+                return;
+
+            var canvas = pdf.BeginPage(PageWidth, PageHeight);
+
+            try
+            {
+                // Заголовок страницы
+                using (var titlePaint = new SKPaint
+                {
+                    Color = SKColors.Red,
+                    TextSize = 24,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                })
+                {
+                    canvas.DrawText("Детализация расходов", Margin, 70, titlePaint);
+                }
+
+                // Таблица с категориями
+                DrawCategoriesTable(canvas, report.ExpenseBreakdown, 120, false);
+            }
+            finally
+            {
+                pdf.EndPage();
+            }
+        }
+
+        private void DrawCategoriesTable(SKCanvas canvas, ObservableCollection<CategoryBreakdownItem> items, float topY, bool isIncome)
+        {
+            var colWidths = new float[] { 80, 300, 200, 150 };
             var startX = Margin;
             var currentY = topY;
 
@@ -465,7 +505,7 @@ namespace Finly.Services
                 // Фон заголовков
                 using var headerBg = new SKPaint
                 {
-                    Color = SKColor.Parse("#6200EA"),
+                    Color = isIncome ? SKColor.Parse("#2E7D32") : SKColor.Parse("#C62828"),
                     Style = SKPaintStyle.Fill
                 };
                 canvas.DrawRect(startX, currentY - 25, PageWidth - 2 * Margin, 30, headerBg);
@@ -480,9 +520,9 @@ namespace Finly.Services
             currentY += 20;
 
             // Строки таблицы
-            for (int i = 0; i < report.CategoryBreakdown.Count; i++)
+            for (int i = 0; i < items.Count; i++)
             {
-                var item = report.CategoryBreakdown[i];
+                var item = items[i];
 
                 // Чередование фона
                 if (i % 2 == 0)
@@ -504,7 +544,7 @@ namespace Finly.Services
 
                 canvas.DrawText((i + 1).ToString(), startX + 30, currentY, textPaint);
                 canvas.DrawText(item.CategoryName, startX + colWidths[0] + 30, currentY, textPaint);
-                canvas.DrawText(item.Amount.ToString("C0"), startX + colWidths[0] + colWidths[1] + 30, currentY, textPaint);
+                canvas.DrawText(FormatAmount(item.Amount), startX + colWidths[0] + colWidths[1] + 30, currentY, textPaint);
                 canvas.DrawText($"{item.Percentage:F1}%", startX + colWidths[0] + colWidths[1] + colWidths[2] + 30, currentY, textPaint);
 
                 currentY += 30;
@@ -512,7 +552,7 @@ namespace Finly.Services
                 // Если страница заканчивается
                 if (currentY > PageHeight - 100)
                 {
-                    // TODO: Добавить новую страницу
+                    // TODO: Добавить новую страницу для продолжения таблицы
                     break;
                 }
             }
@@ -539,98 +579,12 @@ namespace Finly.Services
                     canvas.DrawText("Динамика по месяцам", Margin, 70, titlePaint);
                 }
 
-                // Рисуем линейный график
-                DrawLineChartForPdf(canvas, report, 120);
-
                 // Таблица с данными
-                DrawTrendsTable(canvas, report, 500);
+                DrawTrendsTable(canvas, report, 120);
             }
             finally
             {
                 pdf.EndPage();
-            }
-        }
-
-        private void DrawLineChartForPdf(SKCanvas canvas, ReportData report, float topY)
-        {
-            var chartWidth = PageWidth - 2 * Margin - 100;
-            var chartHeight = 250;
-            var leftX = Margin + 50;
-            var bottomY = topY + chartHeight;
-
-            var trends = report.MonthlyTrends.ToList();
-            if (trends.Count < 2) return;
-
-            // Находим максимум
-            var maxValue = (float)Math.Max(trends.Max(t => t.Income), trends.Max(t => t.Expenses));
-            if (maxValue == 0) maxValue = 1;
-
-            var scale = chartHeight / maxValue;
-            var stepX = chartWidth / (trends.Count - 1);
-
-            // Рисуем сетку
-            using (var gridPaint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = SKColors.LightGray.WithAlpha(0x80),
-                StrokeWidth = 1,
-                PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0)
-            })
-            {
-                for (int i = 0; i <= 5; i++)
-                {
-                    var y = bottomY - (i * chartHeight / 5);
-                    canvas.DrawLine(leftX, y, leftX + chartWidth, y, gridPaint);
-                }
-            }
-
-            // Собираем точки
-            var incomePoints = new List<SKPoint>();
-            var expensePoints = new List<SKPoint>();
-
-            for (int i = 0; i < trends.Count; i++)
-            {
-                var x = leftX + i * stepX;
-                incomePoints.Add(new SKPoint(x, bottomY - (float)trends[i].Income * scale));
-                expensePoints.Add(new SKPoint(x, bottomY - (float)trends[i].Expenses * scale));
-            }
-
-            // Рисуем линии
-            DrawLineSeries(canvas, incomePoints, SKColors.Green);
-            DrawLineSeries(canvas, expensePoints, SKColors.Red);
-
-            // Подписи месяцев
-            using (var textPaint = new SKPaint
-            {
-                Color = SKColors.Black,
-                TextSize = 10,
-                IsAntialias = true,
-                TextAlign = SKTextAlign.Center
-            })
-            {
-                for (int i = 0; i < trends.Count; i++)
-                {
-                    var x = leftX + i * stepX;
-                    canvas.DrawText(trends[i].MonthName, x, bottomY + 20, textPaint);
-                }
-            }
-        }
-
-        private void DrawLineSeries(SKCanvas canvas, List<SKPoint> points, SKColor color)
-        {
-            if (points.Count < 2) return;
-
-            using var paint = new SKPaint
-            {
-                Style = SKPaintStyle.Stroke,
-                Color = color,
-                StrokeWidth = 2,
-                IsAntialias = true
-            };
-
-            for (int i = 0; i < points.Count - 1; i++)
-            {
-                canvas.DrawLine(points[i], points[i + 1], paint);
             }
         }
 
@@ -674,8 +628,8 @@ namespace Finly.Services
                 };
 
                 canvas.DrawText(trend.MonthName, startX + 30, currentY, textPaint);
-                canvas.DrawText(trend.Income.ToString("C0"), startX + colWidths[0] + 30, currentY, textPaint);
-                canvas.DrawText(trend.Expenses.ToString("C0"), startX + colWidths[0] + colWidths[1] + 30, currentY, textPaint);
+                canvas.DrawText(FormatAmount(trend.Income), startX + colWidths[0] + 30, currentY, textPaint);
+                canvas.DrawText(FormatAmount(trend.Expenses), startX + colWidths[0] + colWidths[1] + 30, currentY, textPaint);
 
                 using var savingsPaint = new SKPaint
                 {
@@ -683,9 +637,158 @@ namespace Finly.Services
                     TextSize = 12,
                     IsAntialias = true
                 };
-                canvas.DrawText(trend.Savings.ToString("C0"), startX + colWidths[0] + colWidths[1] + colWidths[2] + 30, currentY, savingsPaint);
+                canvas.DrawText(FormatAmount(trend.Savings), startX + colWidths[0] + colWidths[1] + colWidths[2] + 30, currentY, savingsPaint);
 
                 currentY += 25;
+            }
+        }
+
+        private void DrawTransactionsPage(SKDocument pdf, ReportData report)
+        {
+            if (report.Transactions?.Count == 0)
+                return;
+
+            var canvas = pdf.BeginPage(PageWidth, PageHeight);
+
+            try
+            {
+                // Заголовок страницы
+                using (var titlePaint = new SKPaint
+                {
+                    Color = SKColors.Black,
+                    TextSize = 24,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                })
+                {
+                    canvas.DrawText("Все операции за период", Margin, 70, titlePaint);
+                }
+
+                // Количество операций
+                using (var countPaint = new SKPaint
+                {
+                    Color = SKColors.Gray,
+                    TextSize = 14,
+                    IsAntialias = true
+                })
+                {
+                    canvas.DrawText($"Всего операций: {report.Transactions.Count}", Margin, 100, countPaint);
+                }
+
+                // Таблица с операциями
+                DrawTransactionsTable(canvas, report, 130);
+            }
+            finally
+            {
+                pdf.EndPage();
+            }
+        }
+
+        private void DrawTransactionsTable(SKCanvas canvas, ReportData report, float topY)
+        {
+            var colWidths = new float[] { 60, 100, 80, 150, 150, 200, 120 };
+            var startX = Margin;
+            var currentY = topY;
+
+            // Заголовки таблицы
+            using (var headerPaint = new SKPaint
+            {
+                Color = SKColors.White,
+                TextSize = 11,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+            })
+            {
+                // Фон заголовков
+                using var headerBg = new SKPaint
+                {
+                    Color = SKColor.Parse("#6200EA"),
+                    Style = SKPaintStyle.Fill
+                };
+                canvas.DrawRect(startX, currentY - 20, PageWidth - 2 * Margin, 25, headerBg);
+
+                // Текст заголовков
+                canvas.DrawText("№", startX + 20, currentY, headerPaint);
+                canvas.DrawText("Дата", startX + colWidths[0] + 20, currentY, headerPaint);
+                canvas.DrawText("Тип", startX + colWidths[0] + colWidths[1] + 20, currentY, headerPaint);
+                canvas.DrawText("Категория", startX + colWidths[0] + colWidths[1] + colWidths[2] + 20, currentY, headerPaint);
+                canvas.DrawText("Счет", startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 20, currentY, headerPaint);
+                canvas.DrawText("Описание", startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 20, currentY, headerPaint);
+                canvas.DrawText("Сумма", startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + colWidths[5] + 20, currentY, headerPaint);
+            }
+
+            currentY += 15;
+
+            // Строки таблицы
+            int row = 0;
+            foreach (var item in report.Transactions.OrderByDescending(t => t.Date))
+            {
+                if (currentY > PageHeight - 50)
+                {
+                    // TODO: Добавить новую страницу для продолжения таблицы
+                    break;
+                }
+
+                // Чередование фона
+                if (row % 2 == 0)
+                {
+                    using var rowBg = new SKPaint
+                    {
+                        Color = SKColor.Parse("#F5F5F5"),
+                        Style = SKPaintStyle.Fill
+                    };
+                    canvas.DrawRect(startX, currentY - 12, PageWidth - 2 * Margin, 22, rowBg);
+                }
+
+                using var textPaint = new SKPaint
+                {
+                    Color = SKColors.Black,
+                    TextSize = 10,
+                    IsAntialias = true
+                };
+
+                // Номер
+                canvas.DrawText((row + 1).ToString(), startX + 20, currentY, textPaint);
+
+                // Дата
+                canvas.DrawText(item.Date.ToString("dd.MM.yyyy"), startX + colWidths[0] + 20, currentY, textPaint);
+
+                // Тип
+                canvas.DrawText(item.Type == TransactionType.Income ? "Доход" : "Расход",
+                    startX + colWidths[0] + colWidths[1] + 20, currentY, textPaint);
+
+                // Категория
+                var categoryName = item.CategoryName.Length > 15
+                    ? item.CategoryName.Substring(0, 15) + "..."
+                    : item.CategoryName;
+                canvas.DrawText(categoryName, startX + colWidths[0] + colWidths[1] + colWidths[2] + 20, currentY, textPaint);
+
+                // Счет
+                var accountName = item.AccountName.Length > 15
+                    ? item.AccountName.Substring(0, 15) + "..."
+                    : item.AccountName;
+                canvas.DrawText(accountName, startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + 20, currentY, textPaint);
+
+                // Описание
+                var description = item.Description.Length > 20
+                    ? item.Description.Substring(0, 20) + "..."
+                    : item.Description;
+                canvas.DrawText(description, startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + 20, currentY, textPaint);
+
+                // Сумма
+                using var amountPaint = new SKPaint
+                {
+                    Color = item.Type == TransactionType.Income ? SKColors.Green : SKColors.Red,
+                    TextSize = 10,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                };
+                canvas.DrawText(FormatAmount(item.Amount),
+                    startX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4] + colWidths[5] + 20,
+                    currentY, amountPaint);
+
+                currentY += 22;
+                row++;
             }
         }
     }

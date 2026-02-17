@@ -1,11 +1,12 @@
-﻿
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Finly.Models;
 using Finly.Services;
 using Finly.Views;
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -13,7 +14,6 @@ namespace Finly.ViewModels
 {
     public partial class AccountsViewModel : ObservableObject
     {
-
         private readonly IDataService _dataService;
         private Account _editingAccount;
 
@@ -52,6 +52,7 @@ namespace Finly.ViewModels
 
         [ObservableProperty]
         private decimal _totalBalance;
+
         [ObservableProperty]
         private ObservableCollection<string> _accountTypes =
         [
@@ -61,6 +62,7 @@ namespace Finly.ViewModels
           "Инвестиции",
           "Кредит"
         ];
+
         public AccountsViewModel(IDataService dataService)
         {
             _dataService = dataService;
@@ -77,7 +79,6 @@ namespace Finly.ViewModels
                 var accounts = await _dataService.GetAccountsAsync();
                 System.Diagnostics.Debug.WriteLine($"LoadAccounts: получено {accounts.Count} счетов");
 
-                // Важно: очищаем и добавляем по одному для обновления UI
                 Accounts.Clear();
                 foreach (var account in accounts)
                 {
@@ -87,7 +88,6 @@ namespace Finly.ViewModels
 
                 UpdateTotalBalance();
 
-                // Принудительно обновляем привязки
                 OnPropertyChanged(nameof(Accounts));
                 OnPropertyChanged(nameof(TotalBalance));
             }
@@ -100,7 +100,6 @@ namespace Finly.ViewModels
                 IsBusy = false;
             }
         }
-        
 
         private void UpdateTotalBalance()
         {
@@ -130,16 +129,29 @@ namespace Finly.ViewModels
             IsEditMode = true;
         }
 
-        
-
+        // ИЗМЕНЕННЫЙ МЕТОД: обновлено сообщение о каскадном удалении
         [RelayCommand]
         private async Task DeleteAccount(Account account)
         {
             if (account == null) return;
 
+            // Сначала проверяем, есть ли транзакции у этого счета
+            var transactions = await _dataService.GetTransactionsAsync();
+            var hasTransactions = transactions.Any(t => t.AccountId == account.Id);
+
+            string message;
+            if (hasTransactions)
+            {
+                message = $"Удалить счет '{account.Name}'? Все операции, связанные с этим счетом ({transactions.Count(t => t.AccountId == account.Id)} шт.), также будут безвозвратно удалены.";
+            }
+            else
+            {
+                message = $"Удалить счет '{account.Name}'?";
+            }
+
             var confirm = await Shell.Current.DisplayAlertAsync(
-                "Подтверждение",
-                $"Удалить счет '{account.Name}'? Все операции, связанные с этим счетом, будут сохранены, но счет станет недоступен.",
+                "Подтверждение удаления",
+                message,
                 "Да", "Нет");
 
             if (confirm)
@@ -147,12 +159,30 @@ namespace Finly.ViewModels
                 IsBusy = true;
                 try
                 {
-                    await _dataService.DeleteAccountAsync(account.Id);
-                    await Shell.Current.DisplayAlertAsync("Успех", "Счет удален", "OK");
-                    await LoadAccountsCommand.ExecuteAsync(null);
+                    var result = await _dataService.DeleteAccountAsync(account.Id);
+
+                    if (result > 0)
+                    {
+                        await Shell.Current.DisplayAlertAsync("Успех", "Счет и все связанные операции удалены", "OK");
+
+                        // Отправляем сообщение об изменении данных
+                        WeakReferenceMessenger.Default.Send(new DataChangedMessage
+                        {
+                            EntityType = "Account",
+                            EntityId = account.Id,
+                            ChangeType = ChangeType.Deleted
+                        });
+
+                        await LoadAccountsCommand.ExecuteAsync(null);
+                    }
+                    else
+                    {
+                        await Shell.Current.DisplayAlertAsync("Ошибка", "Не удалось удалить счет", "OK");
+                    }
                 }
                 catch (Exception ex)
                 {
+                    Debug.WriteLine($"Ошибка DeleteAccount: {ex}");
                     await Shell.Current.DisplayAlertAsync("Ошибка", $"Не удалось удалить счет: {ex.Message}", "OK");
                 }
                 finally
@@ -162,9 +192,6 @@ namespace Finly.ViewModels
             }
         }
 
-      
-
-       
         [RelayCommand]
         private async Task NavigateToAddAccount()
         {

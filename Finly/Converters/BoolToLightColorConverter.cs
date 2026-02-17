@@ -1,17 +1,17 @@
-﻿
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace Finly.Converters
 {
-    public class TitleToIconConverter : IValueConverter
+    public class BoolToLightColorConverter : IValueConverter, IMarkupExtension
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            string title = value as string;
-            return title?.Contains("Редактирование") == true ? "✏️" : "➕";
+            return (value is bool isActive && isActive) ? "#F3E5F5" : "#F0F0F0";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotImplementedException();
+
+        public object ProvideValue(IServiceProvider serviceProvider) => this;
     }
 }

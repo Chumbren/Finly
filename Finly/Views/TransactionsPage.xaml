@@ -12,6 +12,7 @@
         <ResourceDictionary>
             <converters:AmountColorConverter x:Key="AmountColorConverter"/>
             <converters:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
+            <converters:StringToBoolConverter x:Key="StringToBoolConverter"/>
             <Shadow x:Key="CardShadow" Brush="#2D3436" Offset="0,4" Radius="12" Opacity="0.15"/>
         </ResourceDictionary>
     </ContentPage.Resources>
@@ -137,43 +138,59 @@
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="viewmodels:TransactionDisplayItem">
                         <SwipeView>
-                            <!-- Свайп ВЛЕВО (Редактировать) -->
+                            <!-- ИЗМЕНЕНО: Увеличен отступ и добавлено закругление для свайпа влево (Редактировать) -->
                             <SwipeView.LeftItems>
                                 <SwipeItems Mode="Reveal">
                                     <SwipeItemView BackgroundColor="#0984E3" 
                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TransactionsViewModel}}, Path=EditTransactionCommand}" 
                                                    CommandParameter="{Binding .}">
-                                        <Grid WidthRequest="90" HeightRequest="100">
-                                            <BoxView BackgroundColor="White" Opacity="0.2" 
-                                                     CornerRadius="10"
-                                                     WidthRequest="60" HeightRequest="60"
-                                                     HorizontalOptions="Center" VerticalOptions="Center"/>
-                                            <Label Text="✏️" FontSize="28" 
-                                                   HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        <Grid WidthRequest="90" HeightRequest="100" Margin="5,5,0,5">
+                                            <!-- Увеличен отступ слева и сверху/снизу -->
+                                            <Border StrokeThickness="0"
+                                                    BackgroundColor="#0984E3"
+                                                    StrokeShape="RoundRectangle 15">
+                                                <!-- Закругленные углы 15px -->
+                                                <Grid>
+                                                    <BoxView BackgroundColor="White" Opacity="0.2" 
+                                                             CornerRadius="10"
+                                                             WidthRequest="60" HeightRequest="60"
+                                                             HorizontalOptions="Center" VerticalOptions="Center"/>
+                                                    <Label Text="✏️" FontSize="28" 
+                                                           HorizontalOptions="Center" VerticalOptions="Center"/>
+                                                </Grid>
+                                            </Border>
                                         </Grid>
                                     </SwipeItemView>
                                 </SwipeItems>
                             </SwipeView.LeftItems>
 
-                            <!-- Свайп ВПРАВО (Удалить) -->
+                            <!-- ИЗМЕНЕНО: Увеличен отступ и добавлено закругление для свайпа вправо (Удалить) -->
                             <SwipeView.RightItems>
                                 <SwipeItems Mode="Reveal">
                                     <SwipeItemView BackgroundColor="#D63031" 
                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TransactionsViewModel}}, Path=DeleteTransactionCommand}" 
                                                    CommandParameter="{Binding .}">
-                                        <Grid WidthRequest="90" HeightRequest="100">
-                                            <BoxView BackgroundColor="White" Opacity="0.2" 
-                                                     CornerRadius="10"
-                                                     WidthRequest="60" HeightRequest="60"
-                                                     HorizontalOptions="Center" VerticalOptions="Center"/>
-                                            <Label Text="🗑️" FontSize="28" 
-                                                   HorizontalOptions="Center" VerticalOptions="Center"/>
+                                        <Grid WidthRequest="90" HeightRequest="100" Margin="0,5,5,5">
+                                            <!-- Увеличен отступ справа и сверху/снизу -->
+                                            <Border StrokeThickness="0"
+                                                    BackgroundColor="#D63031"
+                                                    StrokeShape="RoundRectangle 15">
+                                                <!-- Закругленные углы 15px -->
+                                                <Grid>
+                                                    <BoxView BackgroundColor="White" Opacity="0.2" 
+                                                             CornerRadius="10"
+                                                             WidthRequest="60" HeightRequest="60"
+                                                             HorizontalOptions="Center" VerticalOptions="Center"/>
+                                                    <Label Text="🗑️" FontSize="28" 
+                                                           HorizontalOptions="Center" VerticalOptions="Center"/>
+                                                </Grid>
+                                            </Border>
                                         </Grid>
                                     </SwipeItemView>
                                 </SwipeItems>
                             </SwipeView.RightItems>
 
-                            <!-- Карточка транзакции -->
+                            <!-- Карточка транзакции (без изменений) -->
                             <ContentView Padding="15,6,15,6">
                                 <Frame BackgroundColor="White" 
                                        CornerRadius="20" 
@@ -195,8 +212,7 @@
                                                Padding="0"
                                                IsClippedToBounds="True"
                                                HasShadow="False"
-                                               BorderColor="#6C63FF"
-                                               >
+                                               BorderColor="#6C63FF">
                                             <Label Text="{Binding Category.Icon}" 
                                                    FontSize="26"
                                                    HorizontalOptions="Center" 
@@ -292,8 +308,7 @@
                        Padding="15" 
                        CornerRadius="15"
                        HasShadow="False"
-                       BorderColor="#00D9A5"
-                       >
+                       BorderColor="#00D9A5">
                     <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
                         <Label HorizontalTextAlignment="Center" Text="📈" FontSize="20"/>
                         <Label Text="Доходы" FontSize="12" TextColor="#636E72" HorizontalOptions="Center"/>
@@ -311,8 +326,7 @@
                        Padding="15" 
                        CornerRadius="15"
                        HasShadow="False"
-                       BorderColor="#FF6B6B"
-                       >
+                       BorderColor="#FF6B6B">
                     <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
                         <Label HorizontalTextAlignment="Center" Text="📉" FontSize="20"/>
                         <Label Text="Расходы" FontSize="12" TextColor="#636E72" HorizontalOptions="Center"/>
@@ -330,8 +344,7 @@
                        Padding="15" 
                        CornerRadius="15"
                        HasShadow="False"
-                       BorderColor="#6C63FF"
-                       >
+                       BorderColor="#6C63FF">
                     <VerticalStackLayout Spacing="5" HorizontalOptions="Center">
                         <Label HorizontalTextAlignment="Center" Text="💰" FontSize="20"/>
                         <Label Text="Баланс" FontSize="12" TextColor="#636E72" HorizontalOptions="Center"/>

@@ -89,6 +89,7 @@
                                     SelectedIndex="{Binding TransactionTypeIndex}" 
                                     WidthRequest="120" 
                                     Title="Тип"
+                                    TextColor="Black"
                                     BackgroundColor="#F8F9FE">
                                 <Picker.ItemsSource>
                                     <x:Array Type="{x:Type x:String}">
@@ -266,13 +267,7 @@
                             </Frame>
                         </Grid>
 
-                        <!-- Изменяющаяся надпись для даты -->
-                        <Frame Style="{Binding DateValidationStyle}"
-                               IsVisible="{Binding ShowDateValidation}">
-                            <Label Text="{Binding DateValidationMessage}"
-                                   TextColor="{Binding DateValidationTextColor}"
-                                   FontSize="12"/>
-                        </Frame>
+                       
                     </VerticalStackLayout>
                 </Frame>
 

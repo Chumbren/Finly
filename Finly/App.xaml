@@ -38,6 +38,7 @@
             <converters:BoolToStatusLightColorConverter x:Key="BoolToStatusLightColorConverter"/>
             <converters:TitleToIconConverter x:Key="TitleToIconConverter"/>
             <converters:InvertedBoolToColumnConverter x:Key="InvertedBoolToColumnConverter"/>
+            <converters:CurrencySymbolConverter x:Key="CurrencySymbolConverter"/>
 
         </ResourceDictionary>
     </Application.Resources>

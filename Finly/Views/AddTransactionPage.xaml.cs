@@ -68,7 +68,6 @@ namespace Finly.Views
 
         private void OnDateSelected(object sender, DateChangedEventArgs e)
         {
-            _viewModel.UpdateDateValidation();
         }
     }
 }

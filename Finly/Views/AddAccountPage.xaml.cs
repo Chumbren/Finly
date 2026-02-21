@@ -32,17 +32,34 @@ namespace Finly.Views
         {
             base.OnNavigatedTo(args);
 
-            // Передаем ID счета в ViewModel
             if (_accountId.HasValue)
             {
-                // Для редактирования: создаем ViewModel с ID
-                // (Это уже сделано при регистрации маршрута)
-                _viewModel.LoadAccountDataCommand.Execute(null);
+                _viewModel.LoadAccountDataCommand.Execute(_accountId.Value);
             }
             else
             {
-                // Для нового счета
                 _viewModel.LoadAccountDataCommand.Execute(null);
+            }
+        }
+
+        // Обработчик для изменения текста названия счета
+        private void OnNameTextChanged(object sender, TextChangedEventArgs e)
+        {
+            _viewModel.UpdateNameValidation();
+        }
+
+        // Обработчик для выбора типа счета
+        private void OnTypeSelected(object sender, EventArgs e)
+        {
+            _viewModel.UpdateTypeValidation();
+        }
+
+        // Обработчик для изменения баланса
+        private void OnBalanceTextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is Entry entry)
+            {
+                _viewModel.UpdateBalanceValidation(entry.Text);
             }
         }
     }

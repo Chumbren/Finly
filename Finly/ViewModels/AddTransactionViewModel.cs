@@ -60,9 +60,6 @@ namespace Finly.ViewModels
         private string _accountBorderColor = "#E0E0E0";
 
         [ObservableProperty]
-        private string _dateBorderColor = "#E0E0E0";
-
-        [ObservableProperty]
         private string _amountValidationStyle = "ErrorFrameStyle";
 
         [ObservableProperty]
@@ -73,9 +70,6 @@ namespace Finly.ViewModels
 
         [ObservableProperty]
         private string _accountValidationStyle = "ErrorFrameStyle";
-
-        [ObservableProperty]
-        private string _dateValidationStyle = "ErrorFrameStyle";
 
         [ObservableProperty]
         private bool _showAmountValidation;
@@ -90,9 +84,6 @@ namespace Finly.ViewModels
         private bool _showAccountValidation;
 
         [ObservableProperty]
-        private bool _showDateValidation;
-
-        [ObservableProperty]
         private string _amountValidationMessage = "Сумма должна быть от 0.01 до 9 999 999";
 
         [ObservableProperty]
@@ -105,9 +96,6 @@ namespace Finly.ViewModels
         private string _accountValidationMessage = "Выберите счет";
 
         [ObservableProperty]
-        private string _dateValidationMessage = "Дата не может быть в будущем";
-
-        [ObservableProperty]
         private string _amountValidationTextColor = "#D63031";
 
         [ObservableProperty]
@@ -118,9 +106,6 @@ namespace Finly.ViewModels
 
         [ObservableProperty]
         private string _accountValidationTextColor = "#D63031";
-
-        [ObservableProperty]
-        private string _dateValidationTextColor = "#D63031";
 
         [ObservableProperty]
         private bool _isFormValid;
@@ -288,32 +273,14 @@ namespace Finly.ViewModels
             AccountValidationMessage = $"✓ Счет: {SelectedAccount.Name}";
         }
 
-        public void UpdateDateValidation()
-        {
-            if (Transaction.Date > DateTime.Today)
-            {
-                DateBorderColor = "#D63031";
-                ShowDateValidation = true;
-                DateValidationTextColor = "#D63031";
-                DateValidationStyle = "ErrorFrameStyle";
-                DateValidationMessage = "Дата не может быть в будущем";
-                return;
-            }
-
-            // Все хорошо
-            DateBorderColor = "#E0E0E0";
-            ShowDateValidation = false;
-        }
-
         private void ValidateForm()
         {
             bool isAmountValid = Transaction.Amount > 0 && Transaction.Amount <= MAX_AMOUNT;
             bool isDescriptionValid = !string.IsNullOrWhiteSpace(Transaction.Description) && Transaction.Description.Length >= 3;
             bool isCategoryValid = SelectedCategory != null;
             bool isAccountValid = SelectedAccount != null;
-            bool isDateValid = Transaction.Date <= DateTime.Today;
 
-            IsFormValid = isAmountValid && isDescriptionValid && isCategoryValid && isAccountValid && isDateValid;
+            IsFormValid = isAmountValid && isDescriptionValid && isCategoryValid && isAccountValid;
             SaveButtonColor = IsFormValid ? "#00D9A5" : "#B2BEC3";
         }
 
@@ -389,7 +356,6 @@ namespace Finly.ViewModels
                 }
 
                 UpdateDescriptionValidation();
-                UpdateDateValidation();
                 ValidateForm();
             }
             catch (Exception ex)
@@ -444,7 +410,6 @@ namespace Finly.ViewModels
                     UpdateDescriptionValidation();
                     UpdateCategoryValidation();
                     UpdateAccountValidation();
-                    UpdateDateValidation();
                     ValidateForm();
 
                     Debug.WriteLine($"Транзакция загружена: {transaction.Description}, сумма: {transaction.Amount}");
